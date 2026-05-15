@@ -1,0 +1,37 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+*.pyc
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Node modules (if using frontend build tools)
+node_modules/
