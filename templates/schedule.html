@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule | Engineering Attendance System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+    <style>
+    body { background-color: #0d1f1a; color: #ffffff; font-family: 'Inter', sans-serif; overflow: hidden; }
+    .bg-card-dark { background-color: rgba(22, 43, 37, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); }
+    .sidebar { background-color: rgba(22, 43, 37, 0.4); border-left: 1px solid rgba(255, 255, 255, 0.05); }
+    
+    .nav-item-active { 
+        background-color: rgba(82, 183, 136, 0.15); 
+        color: #52b788; 
+        border-right: 3px solid #52b788; 
+        opacity: 1 !important;
+        position: relative;
+    }
+    .nav-item-active::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 3px;
+        height: 100%;
+        background-color: #52b788;
+        border-radius: 2px;
+    }
+
+    .nav-item { 
+        opacity: 0.8; 
+        transition: all 0.2s; 
+    }
+    .nav-item:hover { 
+        background-color: rgba(255, 255, 255, 0.05); 
+        opacity: 1; 
+    }
+
+    .bg-primary { background-color: #52b788; }
+
+    #schedule-modal { 
+        background-color: rgba(0, 0, 0, 0.85); 
+        display: none; 
+        backdrop-filter: blur(4px); 
+    }
+
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #3d5a52; border-radius: 10px; }
+
+    .modal-container { background-color: #122620; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .inner-section { background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; }
+
+    input, select {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        outline: none !important;
+    }
+    input:focus, select:focus { border-color: #52b788 !important; }
+
+    .label-style {
+        font-size: 10px;
+        font-weight: 800;
+        color: #52b788;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        display: block;
+        letter-spacing: 0.5px;
+    }
+
+    .day-checkbox { display: none; }
+    .day-label {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 10px;
+        font-weight: 900;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: rgba(0,0,0,0.2);
+    }
+    .day-checkbox:checked + .day-label {
+        background-color: #52b788;
+        color: #0d1f1a;
+        border-color: #52b788;
+    }
+    </style>
+</head>
+<body class="flex min-h-screen">
+
+<main class="flex-1 p-8 overflow-y-auto custom-scroll">
+    <header class="flex items-center justify-between mb-10">
+        <div class="flex items-center gap-4">
+            <div class="p-2 bg-[#52b788]/10 rounded-lg border border-white/10">
+                <i data-lucide="calendar" class="text-[#52b788] w-6 h-6"></i>
+            </div>
+            <h1 class="text-2xl font-black uppercase tracking-wider">Schedule</h1>
+        </div>
+        <button onclick="toggleModal(true)"
+            class="flex items-center gap-2 bg-primary text-black px-4 py-2 rounded-lg font-bold text-sm">
+            <i data-lucide="plus" class="w-4 h-4"></i> Add New Schedule
+        </button>
+    </header>
+
+    <div class="bg-card-dark rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-white/5 bg-white/5 flex justify-between">
+            <p class="text-[11px] font-bold uppercase">Class & Lab Schedules</p>
+            <div class="text-[9px] text-[#52b788] font-black">DATABASE CONNECTED</div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="text-[10px] text-gray-500 uppercase font-black border-b border-white/5">
+                    <tr>
+                        <th class="px-6 py-4">Name/Subject</th>
+                        <th class="px-6 py-4">Target Group</th>
+                        <th class="px-6 py-4">Location</th>
+                        <th class="px-6 py-4">Date</th>
+                        <th class="px-6 py-4">Time</th>
+                        <th class="px-6 py-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-tbody" class="text-[11px] font-bold divide-y divide-white/5">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<aside class="w-64 sidebar flex flex-col p-4 hidden lg:flex">
+    <div class="flex flex-col gap-1">
+        <a href="/scanner" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="scan" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Face Scanner</span>
+        </a>
+        <a href="/dashboard" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+        </a>
+        <a href="/students" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Student Records</span>
+        </a>
+        <a href="/logs" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Attendance Log</span>
+        </a>
+        <a href="/schedule" class="nav-item-active flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Schedule</span>
+        </a>
+        <a href="/reports" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Report & Analytics</span>
+        </a>
+        <div class="mt-auto border-t border-white/5 pt-4 flex flex-col gap-1">
+            <a href="/settings" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 hover:bg-white/10 transition-all">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Settings</span>
+            </a>
+            <a href="/logout" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-red-400 hover:bg-red-400/10 transition-all">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Logout</span>
+            </a>
+        </div>
+    </div>
+</aside>
+
+<div id="schedule-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-container w-full max-w-4xl rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+        <form id="schedule-form" class="flex flex-col h-full max-h-[90vh]">
+            <div class="flex-1 p-8 overflow-y-auto custom-scroll">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div class="inner-section p-6">
+                            <h3 class="text-[#52b788] text-[11px] font-black uppercase mb-6 tracking-widest">Schedule Details</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="label-style">Select Type</label>
+                                    <select id="type" class="w-full">
+                                        <option value="Class">Standard Class</option>
+                                        <option value="Lab">Laboratory Session</option>
+                                        <option value="Event">Events</option>
+                                        <option value="Exam">Examination</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="label-style">Scheduled Name / Subject Code</label>
+                                    <input id="name" class="w-full" placeholder="e.g. CPE-412" required>
+                                </div>
+                                <div>
+                                    <label class="label-style">Location / Room No</label>
+                                    <input id="location" class="w-full" placeholder="e.g. Room 302">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="inner-section p-6">
+                            <h3 class="text-[#52b788] text-[11px] font-black uppercase mb-6 tracking-widest">Date & Time</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="label-style">Start Date</label>
+                                    <input type="date" id="date" class="w-full" required>
+                                </div>
+                                
+                                <div>
+                                    <label class="label-style">Recurring Weekly</label>
+                                    <div class="flex gap-2 flex-wrap">
+                                        <input type="checkbox" id="m" class="day-checkbox"><label for="m" class="day-label">Mon</label>
+                                        <input type="checkbox" id="t" class="day-checkbox"><label for="t" class="day-label">Tue</label>
+                                        <input type="checkbox" id="w" class="day-checkbox"><label for="w" class="day-label">Wed</label>
+                                        <input type="checkbox" id="th" class="day-checkbox"><label for="th" class="day-label">Thur</label>
+                                        <input type="checkbox" id="f" class="day-checkbox"><label for="f" class="day-label">Fri</label>
+                                        <input type="checkbox" id="sat" class="day-checkbox"><label for="sat" class="day-label">Sat</label>
+                                        <input type="checkbox" id="sun" class="day-checkbox"><label for="sun" class="day-label">Sun</label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="label-style">Start Time</label>
+                                        <input type="time" id="start_time" class="w-full" value="08:00">
+                                    </div>
+                                    <div>
+                                        <label class="label-style">End Time</label>
+                                        <input type="time" id="end_time" class="w-full" value="10:00">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="inner-section p-6 flex flex-col">
+                        <h3 class="text-[#52b788] text-[11px] font-black uppercase mb-6 tracking-widest">Assigned Course & Year Level</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="label-style">Target Course</label>
+                                <select id="target_course" class="w-full">
+                                    <option value="BSCpE">BS Computer Engineering</option>
+                                    <option value="BSEE">BS Electrical Engineering</option>
+                                    <option value="BSME">BS Mechanical Engineering</option>
+                                    <option value="BSCE">BS Civil Engineering</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label-style">Year Level</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg">
+                                        <input type="radio" name="year_lvl" id="y1" value="1" checked>
+                                        <label for="y1" class="text-xs font-bold">1st Year</label>
+                                    </div>
+                                    <div class="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg">
+                                        <input type="radio" name="year_lvl" id="y2" value="2">
+                                        <label for="y2" class="text-xs font-bold">2nd Year</label>
+                                    </div>
+                                    <div class="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg">
+                                        <input type="radio" name="year_lvl" id="y3" value="3">
+                                        <label for="y3" class="text-xs font-bold">3rd Year</label>
+                                    </div>
+                                    <div class="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg">
+                                        <input type="radio" name="year_lvl" id="y4" value="4">
+                                        <label for="y4" class="text-xs font-bold">4th Year</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="pt-6 border-t border-white/5 mt-auto">
+                                <div class="bg-[#52b788]/5 p-4 rounded-lg border border-[#52b788]/20">
+                                    <p class="text-[10px] text-[#52b788] font-black uppercase mb-1">Selection Summary</p>
+                                    <p id="selection-preview" class="text-xs font-bold opacity-80">BSCpE - 1st Year Students</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 bg-black/20 border-t border-white/5 flex justify-end gap-3">
+                <button type="button" onclick="toggleModal(false)" 
+                    class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold border border-white/10 hover:bg-white/5 transition-all">
+                    <i data-lucide="x" class="w-4 h-4"></i> Cancel
+                </button>
+                <button type="submit" 
+                    class="flex items-center gap-2 px-8 py-2.5 rounded-xl text-xs font-bold bg-[#52b788] text-[#0d1f1a] hover:opacity-90 transition-all shadow-lg shadow-[#52b788]/10">
+                    <i data-lucide="save" class="w-4 h-4"></i> Save Schedule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+window.toggleModal = (show) => {
+    document.getElementById("schedule-modal").style.display = show ? "flex" : "none";
+};
+
+// Target and preview update interactions
+document.querySelectorAll('#target_course, input[name="year_lvl"]').forEach(el => {
+    el.addEventListener('change', () => {
+        const course = document.getElementById('target_course').value;
+        const year = document.querySelector('input[name="year_lvl"]:checked').value;
+        
+        let yearSuffix = 'th';
+        if (year === '1') yearSuffix = 'st';
+        if (year === '2') yearSuffix = 'nd';
+        if (year === '3') yearSuffix = 'rd';
+
+        document.getElementById('selection-preview').innerText = `${course} - ${year}${yearSuffix} Year Students`;
+    });
+});
+
+function formatTimeTo12Hour(timeStr) {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // The hour '0' should be '12'
+    return `${hours}:${minutes} ${ampm}`;
+}
+
+async function loadSchedules() {
+    const tbody = document.getElementById("schedule-tbody");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/api/schedules");
+        const data = await res.json();
+        
+        tbody.innerHTML = "";
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        <div class="flex flex-col items-center justify-center gap-2 opacity-50">
+                            <i data-lucide="calendar" class="w-8 h-8"></i>
+                            <p class="text-xs font-bold">NO SCHEDULES FOUND IN DATABASE</p>
+                        </div>
+                    </td>
+                </tr>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            return;
+        }
+
+        data.forEach(s => {
+            const formattedStart = formatTimeTo12Hour(s.start_time);
+            const formattedEnd = formatTimeTo12Hour(s.end_time);
+            
+            tbody.innerHTML += `
+            <tr id="schedule-row-${s.id}" class="hover:bg-white/5 transition-colors">
+                <td class="px-6 py-4 font-bold">${s.name || 'N/A'}</td>
+                <td class="px-6 py-4 text-[#52b788]">${s.target_course || 'N/A'} - ${s.target_year || 'N/A'}</td>
+                <td class="px-6 py-4">${s.location || 'N/A'}</td>
+                <td class="px-6 py-4">${s.date || 'N/A'}</td>
+                <td class="px-6 py-4">${formattedStart} - ${formattedEnd}</td>
+                <td class="px-6 py-4">
+                    <button onclick="deleteSchedule(${s.id})" class="text-red-400 hover:text-red-300">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </td>
+            </tr>`;
+        });
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    } catch (e) { 
+        console.log("Could not load schedule data", e); 
+    }
+}
+
+document.getElementById("schedule-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const yearVal = document.querySelector('input[name="year_lvl"]:checked').value;
+
+    const data = {
+        name: document.getElementById("name").value,
+        type: document.getElementById("type").value,
+        location: document.getElementById("location").value,
+        target_course: document.getElementById("target_course").value,
+        target_year: yearVal,
+        date: document.getElementById("date").value,
+        start_time: document.getElementById("start_time").value,
+        end_time: document.getElementById("end_time").value,
+        recurring_days: []
+    };
+
+    // Gather checkboxes
+    ['m', 't', 'w', 'th', 'f', 'sat', 'sun'].forEach((dayId) => {
+        if (document.getElementById(dayId).checked) {
+            data.recurring_days.push(dayId);
+        }
+    });
+
+    try {
+        const response = await fetch("/api/schedules", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            toggleModal(false);
+            e.target.reset();
+            loadSchedules();
+        }
+    } catch (err) {
+        console.error("Failed to save schedule", err);
+    }
+});
+
+async function deleteSchedule(scheduleId) {
+    if (confirm("Are you sure you want to delete this schedule?")) {
+        try {
+            const response = await fetch(`/delete_schedule/${scheduleId}`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                const row = document.getElementById(`schedule-row-${scheduleId}`);
+                if (row) {
+                    row.remove();
+                }
+                loadSchedules();
+            }
+        } catch (err) {
+            console.error("Failed to remove item", err);
+        }
+    }
+}
+
+// Initialize components when DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+    loadSchedules();
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+});
+</script>
+
+</body>
+</html>

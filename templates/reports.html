@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report & Analytics - Attendance System</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root {
+      --background: 156 34% 11%;
+      --card: 156 25% 15%;
+      --card-border: 156 20% 23%;
+      --text: 156 10% 90%;
+      --text-muted: 156 10% 60%;
+      --primary: 160 50% 40%;
+      --primary-hex: #52b788;
+      --destructive: 0 70% 55%;
+      --late: 43 74% 66%;
+    }
+
+    body {
+      background-color: #0d1f1a;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: hsl(var(--background)); }
+    ::-webkit-scrollbar-thumb { background: #3d5a52; border-radius: 10px; }
+
+    .bg-card { background-color: rgba(22, 43, 37, 0.6); border: 1px solid rgba(255,255,255,0.05); }
+    .sidebar { background-color: rgba(22, 43, 37, 0.4); border-left: 1px solid rgba(255,255,255,0.05); }
+
+    .nav-item-active {
+      position: relative;
+      background-color: rgba(82,183,136,0.15);
+      color: #52b788;
+      opacity: 1 !important;
+    }
+    .nav-item-active::after {
+      content: "";
+      position: absolute;
+      top: 0; right: 0;
+      width: 3px; height: 100%;
+      background-color: #52b788;
+      border-radius: 2px;
+    }
+    .nav-item { opacity: 0.8; transition: all 0.2s; }
+    .nav-item:hover { background-color: rgba(255,255,255,0.05); opacity: 1; }
+
+    .custom-card {
+      background-color: hsl(var(--card));
+      border: 1px solid hsl(var(--card-border));
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2), 0 2px 4px -1px rgba(0,0,0,0.1);
+    }
+
+    .stat-card {
+      background-color: hsl(var(--card));
+      border: 1px solid hsl(var(--card-border));
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    input, select {
+      background-color: rgba(0,0,0,0.3) !important;
+      border: 1px solid rgba(255,255,255,0.1) !important;
+      color: white !important;
+      border-radius: 6px !important;
+      padding: 8px 12px !important;
+      font-size: 13px !important;
+      outline: none !important;
+    }
+    input:focus, select:focus { border-color: #52b788 !important; }
+
+    /* ─── PRINT STYLES ─── */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 15mm 12mm;
+      }
+
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      body {
+        background-color: #ffffff !important;
+        color: #111111 !important;
+        overflow: visible !important;
+        height: auto !important;
+        font-size: 10pt;
+      }
+
+      /* Hide non-print elements */
+      aside, header, .no-print, .filter-bar, .actions-bar { display: none !important; }
+
+      main {
+        padding: 0 !important;
+        overflow: visible !important;
+        height: auto !important;
+      }
+
+      .print-header {
+        display: block !important;
+        text-align: center;
+        margin-bottom: 16pt;
+        border-bottom: 2px solid #34a853;
+        padding-bottom: 8pt;
+      }
+
+      .print-header h1 { font-size: 18pt; font-weight: 900; color: #1b3127; }
+      .print-header p  { font-size: 9pt; color: #555; }
+
+      /* Stat cards in a row */
+      .stat-grid {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8pt !important;
+        margin-bottom: 12pt !important;
+      }
+      .stat-card {
+        flex: 1 !important;
+        background: #f4faf7 !important;
+        border: 1px solid #b2d8c4 !important;
+        border-radius: 6pt !important;
+        padding: 8pt !important;
+        text-align: center !important;
+      }
+      .stat-card span { color: #111 !important; }
+
+      /* Charts section — hide canvas (they don't print well), show tables instead */
+      .charts-row { display: none !important; }
+
+      /* Cards / tables */
+      .custom-card {
+        background: #ffffff !important;
+        border: 1px solid #cde8d7 !important;
+        border-radius: 6pt !important;
+        margin-bottom: 12pt !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .overflow-x-auto, .max-h-\[300px\], .max-h-\[350px\] {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+      thead { background-color: #d4f0e2 !important; }
+      thead th { color: #1b3127 !important; padding: 5pt 6pt !important; border-bottom: 1px solid #a8d5bc; text-align: left; font-size: 7.5pt; }
+      tbody td { padding: 4pt 6pt !important; border-bottom: 1px solid #eaf5ef !important; color: #222 !important; }
+      tbody tr:nth-child(even) { background-color: #f4fbf7 !important; }
+
+      /* Color overrides for status text in print */
+      .text-emerald-500, .text-emerald-custom { color: #1a7c4a !important; }
+      .text-amber-500  { color: #b45309 !important; }
+      .text-red-500    { color: #b91c1c !important; }
+
+      /* System notes — hide */
+      .system-notes { display: none !important; }
+
+      /* Make all table sections fully visible */
+      table tbody { display: table-row-group !important; }
+
+      /* Page breaks between sections */
+      .print-section { page-break-before: auto; }
+      .print-section-break { page-break-before: always; }
+    }
+
+    /* Hidden by default, shown only during print */
+    .print-header { display: none; }
+  </style>
+</head>
+<body class="flex min-h-screen">
+
+  <main class="flex-1 p-8 overflow-y-auto">
+    <!-- Print-only header -->
+    <div class="print-header">
+      <h1>Attendance Report & Analytics</h1>
+      <p id="printSubtitle">Generated on <span id="printDate"></span></p>
+    </div>
+
+    <header class="flex items-center justify-between mb-10 no-print">
+      <div class="flex items-center gap-4">
+        <div class="p-2 bg-[#52b788]/10 rounded-lg border border-white/10">
+          <i data-lucide="bar-chart-3" class="text-[#52b788] w-6 h-6"></i>
+        </div>
+        <h1 class="text-2xl font-black uppercase tracking-wider">Report & Analytics</h1>
+      </div>
+      <div class="text-[9px] text-[#52b788] font-black hidden sm:block">DATABASE CONNECTED</div>
+    </header>
+
+    <div class="max-w-7xl mx-auto">
+
+      <!-- Filter Bar -->
+      <div class="filter-bar flex flex-wrap items-start gap-4 mb-6 bg-[hsl(var(--card))] p-4 rounded-xl border border-[hsl(var(--card-border))] shadow-sm no-print">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[hsl(var(--text-muted))] font-medium select-none">From:</span>
+          <input type="date" id="dateFrom" onchange="updateData()">
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[hsl(var(--text-muted))] font-medium select-none">To:</span>
+          <input type="date" id="dateTo" onchange="updateData()">
+        </div>
+        
+        <!-- Course Filter -->
+        <div class="flex items-center gap-3 border-l border-[hsl(var(--card-border))] pl-4">
+          <div class="flex items-center gap-2">
+            <input type="radio" id="courseFilterAll" name="courseFilter" value="all" checked onchange="toggleCourseSelection()">
+            <label for="courseFilterAll" class="text-xs text-[hsl(var(--text-muted))] font-medium cursor-pointer select-none">All Courses</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="radio" id="courseFilterSelect" name="courseFilter" value="select" onchange="toggleCourseSelection()">
+            <label for="courseFilterSelect" class="text-xs text-[hsl(var(--text-muted))] font-medium cursor-pointer select-none">Select Courses</label>
+          </div>
+        </div>
+
+        <!-- Course Checkboxes (hidden by default) -->
+        <div id="courseCheckboxes" class="hidden flex flex-wrap gap-2 w-full">
+          <div id="courseCheckboxContainer" class="flex flex-wrap gap-2 w-full"></div>
+        </div>
+
+        <!-- Year Filter -->
+        <div class="flex items-center gap-3 border-l border-[hsl(var(--card-border))] pl-4">
+          <div class="flex items-center gap-2">
+            <input type="radio" id="yearFilterAll" name="yearFilter" value="all" checked onchange="toggleYearSelection()">
+            <label for="yearFilterAll" class="text-xs text-[hsl(var(--text-muted))] font-medium cursor-pointer select-none">All Years</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="radio" id="yearFilterSelect" name="yearFilter" value="select" onchange="toggleYearSelection()">
+            <label for="yearFilterSelect" class="text-xs text-[hsl(var(--text-muted))] font-medium cursor-pointer select-none">Select Years</label>
+          </div>
+        </div>
+
+        <!-- Year Checkboxes (hidden by default) -->
+        <div id="yearCheckboxes" class="hidden flex flex-wrap gap-2 w-full">
+          <div id="yearCheckboxContainer" class="flex flex-wrap gap-2 w-full"></div>
+        </div>
+
+        <div class="flex gap-2 ml-auto">
+          <button onclick="exportExcel()" class="h-9 px-3 text-xs flex items-center bg-[hsl(var(--background))] border border-[hsl(var(--card-border))] text-white rounded-md hover:bg-[hsl(var(--card-border))] cursor-pointer transition-colors duration-200">
+            <i class="fa-regular fa-file-excel mr-1.5 text-emerald-400"></i> Export Excel
+          </button>
+          <button onclick="exportPDF()" class="h-9 px-3 text-xs flex items-center bg-[hsl(var(--background))] border border-[hsl(var(--card-border))] text-white rounded-md hover:bg-[hsl(var(--card-border))] cursor-pointer transition-colors duration-200">
+            <i class="fa-regular fa-file-pdf mr-1.5 text-emerald-400"></i> Download PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stat-grid grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div class="stat-card">
+          <span class="text-[hsl(var(--text-muted))] text-[10px] uppercase tracking-wider font-semibold mb-1 text-center">Total Records</span>
+          <span class="text-2xl font-black text-white" id="statTotal">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="text-[hsl(var(--text-muted))] text-[10px] uppercase tracking-wider font-semibold mb-1 text-center">Present</span>
+          <span class="text-2xl font-black text-emerald-500" id="statPresent">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="text-[hsl(var(--text-muted))] text-[10px] uppercase tracking-wider font-semibold mb-1 text-center">Late</span>
+          <span class="text-2xl font-black text-amber-500" id="statLate">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="text-[hsl(var(--text-muted))] text-[10px] uppercase tracking-wider font-semibold mb-1 text-center">Absent</span>
+          <span class="text-2xl font-black text-red-500" id="statAbsent">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="text-[hsl(var(--text-muted))] text-[10px] uppercase tracking-wider font-semibold mb-1 text-center">Attendance Rate</span>
+          <span class="text-2xl font-black text-white" id="statRate">0%</span>
+        </div>
+      </div>
+
+      <!-- Charts Row (hidden in print) -->
+      <div class="charts-row grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 no-print">
+        <div class="lg:col-span-2 custom-card p-4 flex flex-col justify-between" style="min-height:280px;">
+          <div class="w-full h-[200px]">
+            <canvas id="trendChart"></canvas>
+          </div>
+          <div class="flex items-center gap-5 mt-2 text-[10px] justify-center text-[hsl(var(--text-muted))] font-medium">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></span> Present</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-amber-400 rounded-sm"></span> Late</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-red-500 rounded-sm"></span> Absent</span>
+          </div>
+        </div>
+        <div class="custom-card p-4 flex flex-col justify-between" style="min-height:280px;">
+          <h3 class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-4">Status Breakdown</h3>
+          <div class="w-full h-[180px] flex justify-center items-center">
+            <canvas id="pieChart"></canvas>
+          </div>
+          <div class="flex justify-around items-center w-full mt-3 text-center text-[10px] font-semibold text-white">
+            <div><span class="text-emerald-500 block">Present</span><span id="piePresent">0%</span></div>
+            <div><span class="text-amber-400 block">Late</span><span id="pieLate">0%</span></div>
+            <div><span class="text-red-500 block">Absent</span><span id="pieAbsent">0%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Course Summary Table -->
+      <div class="grid grid-cols-1 gap-6 mb-6 print-section">
+        <div class="custom-card overflow-hidden">
+          <div class="bg-emerald-950/40 border-b border-[hsl(var(--card-border))] px-4 py-3">
+            <p class="text-[10px] font-bold tracking-wider text-emerald-400 uppercase">Course Summary</p>
+          </div>
+          <div class="overflow-x-auto max-h-[300px]">
+            <table class="w-full text-left text-xs border-collapse" id="courseTable">
+              <thead class="bg-emerald-950/60 text-[hsl(var(--text-muted))] border-b border-[hsl(var(--card-border))]">
+                <tr>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Course</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Total</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-emerald-400">Present</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-amber-500">Late</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-red-500">Absent</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Rate</th>
+                </tr>
+              </thead>
+              <tbody id="courseTableBody" class="divide-y divide-[hsl(var(--card-border))] text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Student Records Table -->
+      <div class="grid grid-cols-1 gap-6 mb-6 print-section">
+        <div class="custom-card overflow-hidden">
+          <div class="bg-emerald-950/40 border-b border-[hsl(var(--card-border))] px-4 py-3 flex justify-between items-center">
+            <p class="text-[10px] font-bold tracking-wider text-emerald-400 uppercase">Student Records</p>
+            <span class="text-[10px] text-[hsl(var(--text-muted))]"><span id="entryCount">0</span> entries</span>
+          </div>
+          <div class="overflow-x-auto max-h-[350px]">
+            <table class="w-full text-left text-xs border-collapse" id="studentTable">
+              <thead class="bg-emerald-950/60 text-[hsl(var(--text-muted))] border-b border-[hsl(var(--card-border))]">
+                <tr>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">#</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Student Name</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">SN</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Course</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Year</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-emerald-400">Present</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-amber-500">Late</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider text-red-500">Absent</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Total</th>
+                  <th class="py-3 px-4 font-semibold text-[10px] uppercase tracking-wider">Rate</th>
+                </tr>
+              </thead>
+              <tbody id="studentTableBody" class="divide-y divide-[hsl(var(--card-border))] text-[11px] text-white/80"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Actions -->
+      <div class="grid grid-cols-1 gap-6 mb-12 system-notes no-print">
+        <div class="custom-card p-6 border border-[hsl(var(--card-border))] bg-emerald-950/20">
+          <h4 class="text-xs font-bold tracking-wider text-emerald-400 uppercase mb-3">System Actions & Notes</h4>
+          <p class="text-xs text-[hsl(var(--text-muted))] leading-relaxed mb-4">
+            Use the tools above to review attendance trends and summary reports across programs.
+          </p>
+          <div class="flex gap-3">
+            <button onclick="printReport()" class="h-8 px-4 text-[11px] font-semibold tracking-wider text-white bg-emerald-700/60 rounded-md border border-emerald-500/30 hover:bg-emerald-600/60 cursor-pointer transition">
+              PRINT REPORT
+            </button>
+            <button onclick="alert('System configuration is up to date.')" class="h-8 px-4 text-[11px] font-semibold tracking-wider text-[hsl(var(--text-muted))] bg-black/30 rounded-md border border-white/5 hover:text-white cursor-pointer transition">
+              DIAGNOSTICS
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Sidebar -->
+  <aside class="w-64 sidebar hidden lg:flex flex-col p-4 h-screen sticky top-0 border-l border-white/5">
+    <div class="flex flex-col gap-1">
+      <a href="/scanner" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="scan" class="w-4 h-4"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Face Scanner</span>
+      </a>
+      <a href="/dashboard" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+      </a>
+      <a href="/students" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Student Records</span>
+      </a>
+      <a href="/logs" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="file-text" class="w-4 h-4"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Attendance Log</span>
+      </a>
+      <a href="/schedule" class="nav-item flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="calendar" class="w-4 h-4"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Schedule</span>
+      </a>
+      <a href="/reports" class="nav-item-active flex items-center gap-3 p-3 rounded-lg">
+        <i data-lucide="bar-chart-3" class="w-4 h-4 text-[#52b788]"></i>
+        <span class="text-xs font-bold uppercase tracking-widest">Report & Analytics</span>
+      </a>
+      <div class="mt-auto border-t border-white/5 pt-4 flex flex-col gap-1">
+        <a href="/settings" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 hover:bg-white/10 transition-all">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span class="text-xs font-bold uppercase tracking-widest">Settings</span>
+        </a>
+        <a href="/logout" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-red-400 hover:bg-red-400/10 transition-all">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span class="text-xs font-bold uppercase tracking-widest">Logout</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    lucide.createIcons();
+
+    let trendChartObj = null;
+    let pieChartInstance = null;
+    let attendanceLog = [];
+    let currentFilteredData = [];
+    let currentStudentMap = {};
+    let currentCourseMap = {};
+    let availableCourses = [];
+    let selectedCourses = [];
+    let availableYears = [];
+    let selectedYears = [];
+
+    // Set print date
+    document.getElementById('printDate').textContent = new Date().toLocaleDateString('en-PH', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    async function loadAvailableCourses() {
+      try {
+        const res = await fetch('/api/available-courses');
+        availableCourses = await res.json();
+        selectedCourses = [...availableCourses]; // Default: select all
+        renderCourseCheckboxes();
+      } catch (err) {
+        console.error('Failed to load available courses:', err);
+      }
+    }
+
+    async function loadAvailableYears() {
+      try {
+        const res = await fetch('/api/available-years');
+        availableYears = await res.json();
+        selectedYears = [...availableYears]; // Default: select all
+        renderYearCheckboxes();
+      } catch (err) {
+        console.error('Failed to load available years:', err);
+      }
+    }
+
+    function renderCourseCheckboxes() {
+      const container = document.getElementById('courseCheckboxContainer');
+      container.innerHTML = '';
+      availableCourses.forEach(course => {
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-1.5 text-xs cursor-pointer text-[hsl(var(--text-muted))] hover:text-white transition';
+        label.innerHTML = `
+          <input type="checkbox" class="courseCheckbox" value="${course}" ${selectedCourses.includes(course) ? 'checked' : ''} onchange="updateSelectedCourses()">
+          <span>${course}</span>
+        `;
+        container.appendChild(label);
+      });
+    }
+
+    function renderYearCheckboxes() {
+      const container = document.getElementById('yearCheckboxContainer');
+      container.innerHTML = '';
+      availableYears.forEach(year => {
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-1.5 text-xs cursor-pointer text-[hsl(var(--text-muted))] hover:text-white transition';
+        label.innerHTML = `
+          <input type="checkbox" class="yearCheckbox" value="${year}" ${selectedYears.includes(year) ? 'checked' : ''} onchange="updateSelectedYears()">
+          <span>${year}</span>
+        `;
+        container.appendChild(label);
+      });
+    }
+
+    function toggleCourseSelection() {
+      const selectCoursesRadio = document.getElementById('courseFilterSelect').checked;
+      const checkboxContainer = document.getElementById('courseCheckboxes');
+      
+      if (selectCoursesRadio) {
+        checkboxContainer.classList.remove('hidden');
+        if (selectedCourses.length === 0) {
+          selectedCourses = [...availableCourses];
+          renderCourseCheckboxes();
+        }
+      } else {
+        checkboxContainer.classList.add('hidden');
+        selectedCourses = [...availableCourses];
+      }
+      updateData();
+    }
+
+    function toggleYearSelection() {
+      const selectYearsRadio = document.getElementById('yearFilterSelect').checked;
+      const checkboxContainer = document.getElementById('yearCheckboxes');
+      
+      if (selectYearsRadio) {
+        checkboxContainer.classList.remove('hidden');
+        if (selectedYears.length === 0) {
+          selectedYears = [...availableYears];
+          renderYearCheckboxes();
+        }
+      } else {
+        checkboxContainer.classList.add('hidden');
+        selectedYears = [...availableYears];
+      }
+      updateData();
+    }
+
+    function updateSelectedCourses() {
+      const checkboxes = document.querySelectorAll('.courseCheckbox:checked');
+      selectedCourses = Array.from(checkboxes).map(cb => cb.value);
+      updateData();
+    }
+
+    function updateSelectedYears() {
+      const checkboxes = document.querySelectorAll('.yearCheckbox:checked');
+      selectedYears = Array.from(checkboxes).map(cb => cb.value);
+      updateData();
+    }
+
+    async function loadAttendanceData() {
+      try {
+        const res = await fetch('/api/report-data');
+        attendanceLog = await res.json();
+        updateData();
+      } catch (err) {
+        console.error('Failed to load attendance data:', err);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      loadAvailableCourses();
+      loadAvailableYears();
+      loadAttendanceData();
+    });
+
+    function filterData() {
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo   = document.getElementById('dateTo').value;
+      
+      const useAllCourses = document.getElementById('courseFilterAll').checked;
+      const useAllYears = document.getElementById('yearFilterAll').checked;
+      
+      const coursesToFilter = useAllCourses ? availableCourses : selectedCourses;
+      const yearsToFilter = useAllYears ? availableYears : selectedYears;
+
+      return attendanceLog.filter(r => {
+        const okDate   = (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo);
+        const okCourse = coursesToFilter.length === 0 || !r.course || coursesToFilter.includes(r.course);
+        const okYear = yearsToFilter.length === 0 || !r.year || yearsToFilter.includes(r.year);
+        return okDate && okCourse && okYear;
+      });
+    }
+
+    function normalizeStatus(s) {
+      if (!s) return 'Absent';
+      const up = s.toUpperCase();
+      if (up === 'PRESENT' || up === 'ON-TIME') return 'Present';
+      if (up === 'LATE') return 'Late';
+      if (up === 'ABSENT') return 'Absent';
+      return 'Absent';
+    }
+
+    function updateData() {
+      currentFilteredData = filterData();
+
+      let total = 0, present = 0, late = 0, absent = 0;
+      currentFilteredData.forEach(r => {
+        total++;
+        const s = normalizeStatus(r.status);
+        if (s === 'Present') present++;
+        else if (s === 'Late') late++;
+        else absent++;
+      });
+
+      const rate = total ? (((present + late) / total) * 100).toFixed(1) : 0;
+      document.getElementById('statTotal').innerText   = total;
+      document.getElementById('statPresent').innerText = present;
+      document.getElementById('statLate').innerText    = late;
+      document.getElementById('statAbsent').innerText  = absent;
+      document.getElementById('statRate').innerText    = rate + "%";
+
+      // Build student map
+      currentStudentMap = {};
+      currentFilteredData.forEach(r => {
+        const key = r.student_number || r.sn || r.name;
+        if (!currentStudentMap[key]) {
+          currentStudentMap[key] = {
+            name: r.name, sn: r.student_number || r.sn,
+            course: r.course || 'N/A', year: r.year || 'N/A',
+            Present: 0, Late: 0, Absent: 0, Total: 0
+          };
+        }
+        const s = normalizeStatus(r.status);
+        currentStudentMap[key][s]++;
+        currentStudentMap[key].Total++;
+      });
+
+      const studentTableBody = document.getElementById('studentTableBody');
+      studentTableBody.innerHTML = '';
+      let i = 1;
+      Object.values(currentStudentMap).forEach(s => {
+        const rate = s.Total > 0 ? ((s.Present + s.Late) / s.Total * 100).toFixed(1) : '0.0';
+        studentTableBody.innerHTML += `
+          <tr>
+            <td class="py-3 px-4">${i++}</td>
+            <td class="py-3 px-4">${s.name}</td>
+            <td class="py-3 px-4">${s.sn}</td>
+            <td class="py-3 px-4">${s.course}</td>
+            <td class="py-3 px-4">${s.year}</td>
+            <td class="py-3 px-4 text-emerald-500">${s.Present}</td>
+            <td class="py-3 px-4 text-amber-500">${s.Late}</td>
+            <td class="py-3 px-4 text-red-500">${s.Absent}</td>
+            <td class="py-3 px-4">${s.Total}</td>
+            <td class="py-3 px-4 font-bold">${rate}%</td>
+          </tr>`;
+      });
+      document.getElementById('entryCount').innerText = Object.keys(currentStudentMap).length;
+
+      // Build course map
+      currentCourseMap = {};
+      currentFilteredData.forEach(r => {
+        const c = r.course || 'N/A';
+        if (!currentCourseMap[c]) currentCourseMap[c] = { Present: 0, Late: 0, Absent: 0, Total: 0 };
+        const s = normalizeStatus(r.status);
+        currentCourseMap[c][s]++;
+        currentCourseMap[c].Total++;
+      });
+
+      const courseTableBody = document.getElementById('courseTableBody');
+      courseTableBody.innerHTML = '';
+      Object.keys(currentCourseMap).forEach(c => {
+        const d = courseTableBody[c] || currentCourseMap[c];
+        const rate = d.Total > 0 ? ((d.Present + d.Late) / d.Total * 100).toFixed(1) : '0.0';
+        courseTableBody.innerHTML += `
+          <tr>
+            <td class="py-3 px-4">${c}</td>
+            <td class="py-3 px-4">${d.Total}</td>
+            <td class="py-3 px-4 text-emerald-500">${d.Present}</td>
+            <td class="py-3 px-4 text-amber-500">${d.Late}</td>
+            <td class="py-3 px-4 text-red-500">${d.Absent}</td>
+            <td class="py-3 px-4">${rate}%</td>
+          </tr>`;
+      });
+
+      const totalStatuses = present + late + absent;
+      document.getElementById('piePresent').innerText = totalStatuses ? ((present / totalStatuses) * 100).toFixed(1) + '%' : '0%';
+      document.getElementById('pieLate').innerText    = totalStatuses ? ((late   / totalStatuses) * 100).toFixed(1) + '%' : '0%';
+      document.getElementById('pieAbsent').innerText  = totalStatuses ? ((absent / totalStatuses) * 100).toFixed(1) + '%' : '0%';
+
+      updateCharts(['Present', 'Late', 'Absent'], [present, late, absent]);
+    }
+
+    function updateCharts(labels, data) {
+      if (trendChartObj) trendChartObj.destroy();
+      const trendCtx = document.getElementById('trendChart').getContext('2d');
+      trendChartObj = new Chart(trendCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Attendance Breakdown',
+            data,
+            backgroundColor: ['rgba(52,168,83,0.2)', 'rgba(251,192,45,0.2)', 'rgba(217,48,37,0.2)'],
+            borderColor: ['#34A853', '#FBC02D', '#D93025'],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#85948E', font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: '#85948E', font: { size: 10 } } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      if (pieChartInstance) pieChartInstance.destroy();
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      pieChartInstance = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data, backgroundColor: ['#34A853', '#FBC02D', '#D93025'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+    }
+
+    // ─── EXCEL EXPORT ───────────────────────────────────────────
+    function exportExcel() {
+      const wb = XLSX.utils.book_new();
+
+      // Get course and year information
+      const useAllCourses = document.getElementById('courseFilterAll').checked;
+      const useAllYears = document.getElementById('yearFilterAll').checked;
+      const coursesInfo = useAllCourses ? 'All Courses' : `Selected: ${selectedCourses.join(', ')}`;
+      const yearsInfo = useAllYears ? 'All Years' : `Selected: ${selectedYears.join(', ')}`;
+
+      // --- Summary sheet ---
+      const summaryData = [
+        ['Attendance Report Summary'],
+        ['Generated', new Date().toLocaleString('en-PH')],
+        ['Courses Included', coursesInfo],
+        ['Years Included', yearsInfo],
+        [],
+        ['Metric', 'Value'],
+        ['Total Records',    document.getElementById('statTotal').innerText],
+        ['Present',          document.getElementById('statPresent').innerText],
+        ['Late',             document.getElementById('statLate').innerText],
+        ['Absent',           document.getElementById('statAbsent').innerText],
+        ['Attendance Rate',  document.getElementById('statRate').innerText],
+      ];
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      wsSummary['!cols'] = [{ wch: 20 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+      // --- Course Summary sheet ---
+      const courseRows = [['Course', 'Total', 'Present', 'Late', 'Absent', 'Attendance Rate']];
+      Object.keys(currentCourseMap).forEach(c => {
+        const d = currentCourseMap[c];
+        const rate = d.Total > 0 ? ((d.Present + d.Late) / d.Total * 100).toFixed(1) + '%' : '0.0%';
+        courseRows.push([c, d.Total, d.Present, d.Late, d.Absent, rate]);
+      });
+      const wsCourse = XLSX.utils.aoa_to_sheet(courseRows);
+      wsCourse['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, wsCourse, 'Course Summary');
+
+      // --- Student Records sheet ---
+      const studentRows = [['#', 'Student Name', 'Student Number', 'Course', 'Year', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate']];
+      let i = 1;
+      Object.values(currentStudentMap).forEach(s => {
+        const rate = s.Total > 0 ? ((s.Present + s.Late) / s.Total * 100).toFixed(1) + '%' : '0.0%';
+        studentRows.push([i++, s.name, s.sn, s.course, s.year, s.Present, s.Late, s.Absent, s.Total, rate]);
+      });
+      const wsStudent = XLSX.utils.aoa_to_sheet(studentRows);
+      wsStudent['!cols'] = [
+        { wch: 5 }, { wch: 28 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
+        { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 18 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsStudent, 'Student Records');
+
+      // --- Raw Data sheet ---
+      const rawRows = [['Name', 'Student Number', 'Course', 'Year', 'Status', 'Date', 'Time In']];
+      currentFilteredData.forEach(r => {
+        rawRows.push([r.name, r.student_number || r.sn, r.course, r.year, r.status, r.date, r.time_in || '']);
+      });
+      const wsRaw = XLSX.utils.aoa_to_sheet(rawRows);
+      wsRaw['!cols'] = [
+        { wch: 28 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
+        { wch: 12 }, { wch: 14 }, { wch: 12 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsRaw, 'Raw Data');
+
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo   = document.getElementById('dateTo').value;
+      const rangeStr = (dateFrom && dateTo) ? `_${dateFrom}_to_${dateTo}` : '';
+      XLSX.writeFile(wb, `Attendance_Report${rangeStr}.xlsx`);
+    }
+
+    // ─── PDF EXPORT ─────────────────────────────────────────────
+    function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo   = document.getElementById('dateTo').value;
+      const useAllCourses = document.getElementById('courseFilterAll').checked;
+      const useAllYears = document.getElementById('yearFilterAll').checked;
+      const coursesLabel = useAllCourses ? 'All Courses' : `Courses: ${selectedCourses.join(', ')}`;
+      const yearsLabel = useAllYears ? 'All Years' : `Years: ${selectedYears.join(', ')}`;
+      const rangeLabel = (dateFrom && dateTo) ? `${dateFrom} to ${dateTo}` : 'All Dates';
+      const generated  = new Date().toLocaleString('en-PH');
+
+      const PAGE_W = doc.internal.pageSize.getWidth();
+      const MARGIN = 14;
+      const COL_W  = PAGE_W - MARGIN * 2;
+
+      // ── Page 1: Cover / Summary ──
+      doc.setFillColor(13, 31, 26);
+      doc.rect(0, 0, PAGE_W, doc.internal.pageSize.getHeight(), 'F');
+
+      doc.setTextColor(82, 183, 136);
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ATTENDANCE REPORT & ANALYTICS', PAGE_W / 2, 30, { align: 'center' });
+
+      doc.setFontSize(9);
+      doc.setTextColor(180, 210, 195);
+      doc.text(`Generated: ${generated}`, PAGE_W / 2, 38, { align: 'center' });
+      doc.text(`Date Range: ${rangeLabel}   |   ${coursesLabel}   |   ${yearsLabel}`, PAGE_W / 2, 44, { align: 'center' });
+
+      // Summary stats box
+      const stats = [
+        ['Total Records', document.getElementById('statTotal').innerText],
+        ['Present',       document.getElementById('statPresent').innerText],
+        ['Late',          document.getElementById('statLate').innerText],
+        ['Absent',        document.getElementById('statAbsent').innerText],
+        ['Attendance Rate', document.getElementById('statRate').innerText],
+      ];
+
+      doc.autoTable({
+        startY: 52,
+        head: [['Metric', 'Value']],
+        body: stats,
+        theme: 'grid',
+        margin: { left: MARGIN, right: MARGIN },
+        tableWidth: COL_W / 2,
+        headStyles: { fillColor: [27, 79, 55], textColor: [82, 183, 136], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fillColor: [22, 43, 37], textColor: [210, 235, 220], fontSize: 9 },
+        alternateRowStyles: { fillColor: [18, 36, 30] },
+      });
+
+      // ── Page 2: Course Summary ──
+      doc.addPage();
+      doc.setFillColor(13, 31, 26);
+      doc.rect(0, 0, PAGE_W, doc.internal.pageSize.getHeight(), 'F');
+
+      doc.setTextColor(82, 183, 136);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('COURSE SUMMARY', MARGIN, 18);
+
+      const courseBody = Object.keys(currentCourseMap).map(c => {
+        const d = currentCourseMap[c];
+        const rate = d.Total > 0 ? ((d.Present + d.Late) / d.Total * 100).toFixed(1) + '%' : '0.0%';
+        return [c, d.Total, d.Present, d.Late, d.Absent, rate];
+      });
+
+      doc.autoTable({
+        startY: 24,
+        head: [['Course', 'Total', 'Present', 'Late', 'Absent', 'Rate']],
+        body: courseBody.length ? courseBody : [['No data', '', '', '', '', '']],
+        theme: 'grid',
+        margin: { left: MARGIN, right: MARGIN },
+        headStyles: { fillColor: [27, 79, 55], textColor: [82, 183, 136], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fillColor: [22, 43, 37], textColor: [210, 235, 220], fontSize: 9 },
+        alternateRowStyles: { fillColor: [18, 36, 30] },
+        columnStyles: {
+          2: { textColor: [52, 168, 83] },
+          3: { textColor: [251, 192, 45] },
+          4: { textColor: [217, 48, 37] },
+        }
+      });
+
+      // ── Page 3+: Student Records (auto-paginated) ──
+      doc.addPage();
+      doc.setFillColor(13, 31, 26);
+      doc.rect(0, 0, PAGE_W, doc.internal.pageSize.getHeight(), 'F');
+
+      doc.setTextColor(82, 183, 136);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('STUDENT RECORDS', MARGIN, 18);
+
+      let idx = 1;
+      const studentBody = Object.values(currentStudentMap).map(s => {
+        const rate = s.Total > 0 ? ((s.Present + s.Late) / s.Total * 100).toFixed(1) + '%' : '0.0%';
+        return [idx++, s.name, s.sn, s.course, s.year, s.Present, s.Late, s.Absent, s.Total, rate];
+      });
+
+      doc.autoTable({
+        startY: 24,
+        head: [['#', 'Student Name', 'Student Number', 'Course', 'Yr', 'Present', 'Late', 'Absent', 'Total', 'Rate']],
+        body: studentBody.length ? studentBody : [['No data', '', '', '', '', '', '', '', '', '']],
+        theme: 'grid',
+        margin: { left: MARGIN, right: MARGIN },
+        headStyles: { fillColor: [27, 79, 55], textColor: [82, 183, 136], fontStyle: 'bold', fontSize: 7.5 },
+        bodyStyles: { fillColor: [22, 43, 37], textColor: [210, 235, 220], fontSize: 8.5 },
+        alternateRowStyles: { fillColor: [18, 36, 30] },
+        columnStyles: {
+          5: { textColor: [52, 168, 83] },
+          6: { textColor: [251, 192, 45] },
+          7: { textColor: [217, 48, 37] },
+        },
+        // Auto-adds new pages when table overflows
+        didDrawPage: (data) => {
+          // Re-fill background for new pages
+          doc.setFillColor(13, 31, 26);
+          // Footer on each page
+          doc.setTextColor(100, 140, 120);
+          doc.setFontSize(7);
+          doc.text(
+            `Attendance Report  |  ${generated}  |  Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
+            PAGE_W / 2,
+            doc.internal.pageSize.getHeight() - 6,
+            { align: 'center' }
+          );
+        }
+      });
+
+      // ── Page N+1: Raw Attendance Log ──
+      doc.addPage();
+      doc.setFillColor(13, 31, 26);
+      doc.rect(0, 0, PAGE_W, doc.internal.pageSize.getHeight(), 'F');
+
+      doc.setTextColor(82, 183, 136);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RAW ATTENDANCE LOG', MARGIN, 18);
+
+      const rawBody = currentFilteredData.map(r => [
+        r.name, r.student_number || r.sn, r.course, r.year,
+        normalizeStatus(r.status), r.date, r.time_in || '--'
+      ]);
+
+      doc.autoTable({
+        startY: 24,
+        head: [['Name', 'Student No.', 'Course', 'Year', 'Status', 'Date', 'Time In']],
+        body: rawBody.length ? rawBody : [['No data', '', '', '', '', '', '']],
+        theme: 'grid',
+        margin: { left: MARGIN, right: MARGIN },
+        headStyles: { fillColor: [27, 79, 55], textColor: [82, 183, 136], fontStyle: 'bold', fontSize: 7.5 },
+        bodyStyles: { fillColor: [22, 43, 37], textColor: [210, 235, 220], fontSize: 8 },
+        alternateRowStyles: { fillColor: [18, 36, 30] },
+        columnStyles: {
+          4: {
+            fontStyle: 'bold',
+            // color handled per-cell below
+          }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 4) {
+            const v = data.cell.raw;
+            if (v === 'Present') data.cell.styles.textColor = [52, 168, 83];
+            else if (v === 'Late')    data.cell.styles.textColor = [251, 192, 45];
+            else if (v === 'Absent')  data.cell.styles.textColor = [217, 48, 37];
+          }
+        },
+        didDrawPage: (data) => {
+          doc.setFillColor(13, 31, 26);
+          doc.setTextColor(100, 140, 120);
+          doc.setFontSize(7);
+          doc.text(
+            `Attendance Report  |  ${generated}  |  Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
+            PAGE_W / 2,
+            doc.internal.pageSize.getHeight() - 6,
+            { align: 'center' }
+          );
+        }
+      });
+
+      const rangeStr = (dateFrom && dateTo) ? `_${dateFrom}_to_${dateTo}` : '';
+      doc.save(`Attendance_Report${rangeStr}.pdf`);
+    }
+
+    // ─── PRINT ───────────────────────────────────────────────────
+    function printReport() {
+      // Update print subtitle with current filter info
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo   = document.getElementById('dateTo').value;
+      const course   = document.getElementById('courseFilter').value;
+      const range    = (dateFrom && dateTo) ? ` | ${dateFrom} to ${dateTo}` : '';
+      document.getElementById('printSubtitle').innerHTML =
+        `Generated on <span id="printDate">${new Date().toLocaleString('en-PH')}</span>${range} | Course: ${course}`;
+      window.print();
+    }
+
+    // Also wire the filter inputs to auto-update
+    document.getElementById('dateFrom').addEventListener('change', updateData);
+    document.getElementById('dateTo').addEventListener('change', updateData);
+    document.getElementById('courseFilter').addEventListener('change', updateData);
+  </script>
+</body>
+</html>

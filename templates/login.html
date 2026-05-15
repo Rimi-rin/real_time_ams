@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Login - Attendance System | Role Selector</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+    :root {
+        --bg-gradient: linear-gradient(to right, #0f3d3e, #3a7d6b);
+        --top-bar-gradient: linear-gradient(to right, #0b2f30, #1f5c4d);
+        --text-color: #d9f0d9;
+        --login-bg: rgba(0,0,0,0.2);
+        --icon-bg: #1f5c4d;
+        --input-bg: #e6f0e6;
+        --input-text: #0b2f30;
+        --input-border: #88b089;
+        --btn-bg: #4fa16b;
+        --btn-hover-bg: #3e8f56;
+        --role-btn-bg: rgba(255,255,255,0.15);
+        --role-btn-border: #88b089;
+        --role-active-bg: #4fa16b;
+        --role-active-text: white;
+    }
+
+    body.light-mode {
+        --bg-gradient: linear-gradient(to right, #d9f0d9, #a3c4a3);
+        --top-bar-gradient: linear-gradient(to right, #b2d8b2, #88b089);
+        --text-color: #0b2f30;
+        --login-bg: rgba(255, 255, 255, 0.85);
+        --icon-bg: #88b089;
+        --input-bg: #fff;
+        --input-text: #0b2f30;
+        --input-border: #4fa16b;
+        --btn-bg: #4fa16b;
+        --role-btn-bg: #e9f5e9;
+        --role-btn-border: #88b089;
+        --role-active-bg: #2c7a4a;
+        --role-active-text: white;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+        background: var(--bg-gradient);
+        color: var(--text-color);
+        transition: background 0.25s ease, color 0.2s ease;
+        min-height: 100vh;
+    }
+
+    .top-bar {
+        width: 100%;
+        background: var(--top-bar-gradient);
+        padding: 60px 0;
+        text-align: center;
+        position: relative;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .top-bar h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .logo { position: absolute; left: 20px; top: 10px; }
+    .logo img { width: 150px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+    .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: calc(100vh - 180px);
+        padding: 30px 20px;
+    }
+
+    .login-box {
+        padding: 30px 35px;
+        border-radius: 28px;
+        background: var(--login-bg);
+        backdrop-filter: blur(4px);
+        width: 100%;
+        max-width: 380px;
+        text-align: center;
+        box-shadow: 0 20px 35px rgba(0,0,0,0.2);
+        transition: all 0.2s;
+    }
+
+    .icon-circle {
+        width: 100px; height: 100px;
+        border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        margin: 0 auto 20px;
+        background: var(--icon-bg);
+        box-shadow: 0 5px 12px rgba(0,0,0,0.2);
+    }
+    .icon-circle i { font-size: 42px; color: var(--text-color); }
+
+    .input-group { margin: 18px 0; text-align: left; }
+    label {
+        display: block; font-weight: 600; margin-bottom: 8px;
+        font-size: 13px; letter-spacing: 0.5px; opacity: 0.9;
+    }
+
+    input {
+        width: 100%; padding: 12px 16px; border-radius: 30px;
+        border: 1px solid var(--input-border); background: var(--input-bg);
+        color: var(--input-text); font-size: 14px; transition: 0.2s; outline: none;
+    }
+    input:focus {
+        border-color: var(--btn-bg);
+        box-shadow: 0 0 0 2px rgba(79,161,107,0.3);
+    }
+
+    .role-section { margin: 20px 0 12px; text-align: left; }
+    .role-label { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: block; letter-spacing: 0.5px; }
+    .role-buttons-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+    .role-btn {
+        flex: 1; background: var(--role-btn-bg); border: 1.5px solid var(--role-btn-border);
+        color: var(--text-color); padding: 10px 0; border-radius: 40px; font-weight: 600;
+        font-size: 14px; cursor: pointer; transition: all 0.2s ease; text-align: center;
+        backdrop-filter: blur(2px); letter-spacing: 0.3px;
+    }
+    .role-btn i { margin-right: 6px; font-size: 13px; }
+    .role-btn.active {
+        background: var(--role-active-bg); border-color: var(--role-active-bg);
+        color: var(--role-active-text); box-shadow: 0 4px 10px rgba(0,0,0,0.2); transform: scale(1.01);
+    }
+    .role-btn:not(.active):hover {
+        background: rgba(79,161,107,0.3); border-color: var(--btn-bg); transform: translateY(-1px);
+    }
+
+    .btn {
+        margin-top: 18px; padding: 12px; border-radius: 40px; border: none;
+        background: var(--btn-bg); color: #fff; font-size: 16px; font-weight: bold;
+        width: 100%; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .btn:hover { background: var(--btn-hover-bg); transform: scale(1.01); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+    .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+    /* Register link below login button */
+    .register-link {
+        display: block;
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--text-color);
+        opacity: 0.75;
+        cursor: pointer;
+        text-decoration: none;
+        transition: opacity 0.2s;
+    }
+    .register-link:hover { opacity: 1; text-decoration: underline; }
+    .register-link i { margin-right: 5px; }
+
+    .toggle-btn {
+        position: fixed; top: 20px; right: 20px;
+        background: var(--btn-bg); border: none; padding: 8px 20px;
+        border-radius: 40px; color: white; font-weight: bold; cursor: pointer;
+        z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: 0.2s; font-size: 14px;
+    }
+    .toggle-btn:hover { background: var(--btn-hover-bg); transform: scale(0.98); }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+        display: none;
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(3px);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+        background: linear-gradient(to bottom right, #0f3d3e, #1f5c4d);
+        border: 1px solid rgba(136,176,137,0.3);
+        border-radius: 28px;
+        padding: 32px 35px;
+        width: 100%;
+        max-width: 400px;
+        color: #d9f0d9;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+        position: relative;
+        animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.92) translateY(16px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-close {
+        position: absolute; top: 16px; right: 20px;
+        background: none; border: none; color: rgba(217,240,217,0.5);
+        font-size: 22px; cursor: pointer; transition: color 0.2s; line-height: 1;
+    }
+    .modal-close:hover { color: #d9f0d9; }
+
+    .modal-title {
+        font-size: 20px; font-weight: 700; margin: 0 0 4px;
+        letter-spacing: 0.3px;
+    }
+    .modal-subtitle {
+        font-size: 12px; color: rgba(217,240,217,0.55);
+        margin: 0 0 22px; letter-spacing: 0.3px;
+    }
+
+    .modal-input-group { margin: 14px 0; text-align: left; }
+    .modal-label {
+        display: block; font-size: 12px; font-weight: 600;
+        letter-spacing: 0.5px; margin-bottom: 7px; opacity: 0.85;
+    }
+    .modal-input {
+        width: 100%; padding: 11px 16px; border-radius: 30px;
+        border: 1px solid rgba(136,176,137,0.4);
+        background: rgba(230,240,230,0.12);
+        color: #d9f0d9; font-size: 14px; outline: none; transition: 0.2s;
+    }
+    .modal-input::placeholder { color: rgba(217,240,217,0.35); }
+    .modal-input:focus {
+        border-color: #4fa16b;
+        background: rgba(230,240,230,0.18);
+        box-shadow: 0 0 0 2px rgba(79,161,107,0.25);
+    }
+
+    .modal-note {
+        font-size: 11px;
+        background: rgba(79,161,107,0.15);
+        border: 1px solid rgba(79,161,107,0.3);
+        border-radius: 10px;
+        padding: 10px 14px;
+        color: rgba(217,240,217,0.8);
+        text-align: left;
+        margin-bottom: 18px;
+        line-height: 1.5;
+    }
+    .modal-note i { color: #4fa16b; margin-right: 5px; }
+
+    .modal-btn {
+        width: 100%; padding: 12px; border-radius: 40px; border: none;
+        background: #4fa16b; color: #fff; font-size: 15px; font-weight: 700;
+        cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .modal-btn:hover { background: #3e8f56; transform: scale(1.01); }
+    .modal-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .modal-divider {
+        border: none; border-top: 1px solid rgba(136,176,137,0.2);
+        margin: 20px 0;
+    }
+
+    .back-to-login {
+        display: block; text-align: center; font-size: 13px;
+        color: rgba(217,240,217,0.6); cursor: pointer; transition: 0.2s;
+        background: none; border: none; width: 100%;
+    }
+    .back-to-login:hover { color: #d9f0d9; }
+
+    @media (max-width: 480px) {
+        .login-box { padding: 25px 20px; }
+        .role-buttons-group { gap: 8px; }
+        .role-btn { font-size: 12px; padding: 8px 0; }
+        .top-bar h1 { font-size: 20px; }
+        .logo img { width: 100px; }
+        .modal-box { padding: 28px 20px; }
+    }
+</style>
+</head>
+<body>
+
+<button id="toggleBtn" class="toggle-btn">Light Mode</button>
+
+<div class="top-bar">
+    <h1>REAL-TIME ATTENDANCE &amp; MONITORING SYSTEM</h1>
+    <div class="logo"><img src="/static/logo/logo.png" alt="School Logo" onerror="this.onerror=null;this.style.display='none'"></div>
+</div>
+
+<div class="container">
+    <div class="login-box">
+        <div class="icon-circle"><i class="fas fa-user-graduate"></i></div>
+
+        <div class="input-group">
+            <label><i class="fas fa-user"></i> USERNAME</label>
+            <input type="text" id="username" placeholder="Username" autocomplete="username">
+        </div>
+
+        <div class="input-group">
+            <label><i class="fas fa-lock"></i> PASSWORD</label>
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+        </div>
+
+        <div class="role-section">
+            <div class="role-label"><i class="fas fa-tag"></i> SELECT YOUR ROLE</div>
+            <div class="role-buttons-group" id="roleButtonsContainer">
+                <button type="button" data-role="student" class="role-btn active" id="roleStudentBtn"><i class="fas fa-graduation-cap"></i> Student</button>
+                <button type="button" data-role="faculty" class="role-btn" id="roleFacultyBtn"><i class="fas fa-chalkboard-user"></i> Faculty</button>
+                <button type="button" data-role="admin"   class="role-btn" id="roleAdminBtn"><i class="fas fa-shield-alt"></i> Admin</button>
+            </div>
+        </div>
+
+        <button class="btn" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Log in</button>
+
+        <!-- Student self-registration link — visible only when Student role is selected -->
+        <a class="register-link" id="registerLink" onclick="openRegisterModal()">
+            <i class="fas fa-user-plus"></i> New student? Create an account
+        </a>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     STUDENT SELF-REGISTRATION MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="registerModal">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeRegisterModal()">&#x2715;</button>
+
+        <p class="modal-title"><i class="fas fa-user-plus" style="color:#4fa16b;margin-right:8px;"></i>Student Registration</p>
+        <p class="modal-subtitle">Create your student login account</p>
+
+        <div class="modal-note">
+            <i class="fas fa-circle-info"></i>
+            <strong>Username must be your Student Number</strong> (e.g. C230238).<br>
+            After logging in, complete your profile and upload face photos in the Student Portal.
+        </div>
+
+        <div class="modal-input-group">
+            <label class="modal-label"><i class="fas fa-id-card"></i> STUDENT NUMBER</label>
+            <input type="text" class="modal-input" id="reg-username" placeholder="e.g. C230238" autocomplete="off">
+        </div>
+
+        <div class="modal-input-group">
+            <label class="modal-label"><i class="fas fa-lock"></i> PASSWORD</label>
+            <input type="password" class="modal-input" id="reg-password" placeholder="Create a password" autocomplete="new-password">
+        </div>
+
+        <div class="modal-input-group">
+            <label class="modal-label"><i class="fas fa-lock"></i> CONFIRM PASSWORD</label>
+            <input type="password" class="modal-input" id="reg-confirm" placeholder="Repeat your password" autocomplete="new-password">
+        </div>
+
+        <hr class="modal-divider">
+
+        <button class="modal-btn" id="regSubmitBtn" onclick="submitStudentRegistration()">
+            <i class="fas fa-check-circle"></i> Create Student Account
+        </button>
+        <button class="back-to-login" onclick="closeRegisterModal()">
+            <i class="fas fa-arrow-left" style="margin-right:5px;"></i> Back to Login
+        </button>
+    </div>
+</div>
+
+<script>
+// ========================
+// 1. THEME TOGGLE
+// ========================
+const toggleBtn = document.getElementById('toggleBtn');
+toggleBtn.addEventListener('click', () => {
+    document.body.classList.toggle('light-mode');
+    toggleBtn.textContent = document.body.classList.contains('light-mode') ? 'Dark Mode' : 'Light Mode';
+});
+
+// ========================
+// 2. ROLE SELECTION
+// ========================
+let selectedRole = 'student';
+
+const roleStudent  = document.getElementById('roleStudentBtn');
+const roleFaculty  = document.getElementById('roleFacultyBtn');
+const roleAdmin    = document.getElementById('roleAdminBtn');
+const allRoleBtns  = [roleStudent, roleFaculty, roleAdmin];
+const registerLink = document.getElementById('registerLink');
+
+function setActiveRole(roleValue, activeButton) {
+    allRoleBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
+    if (activeButton) activeButton.classList.add('active');
+    selectedRole = roleValue;
+
+    // Show "create account" link only for student role
+    registerLink.style.display = roleValue === 'student' ? 'block' : 'none';
+}
+
+roleStudent.addEventListener('click', () => setActiveRole('student', roleStudent));
+roleFaculty.addEventListener('click', () => setActiveRole('faculty', roleFaculty));
+roleAdmin.addEventListener('click',   () => setActiveRole('admin',   roleAdmin));
+
+// Init
+window.addEventListener('DOMContentLoaded', () => {
+    setActiveRole('student', roleStudent);
+});
+
+// ========================
+// 3. LOGIN
+// ========================
+const loginBtn      = document.getElementById('loginBtn');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+
+loginBtn.addEventListener('click', async () => {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if (!username || !password) { alert("Please fill in both username and password."); return; }
+
+    loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+    loginBtn.disabled  = true;
+
+    try {
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, role: selectedRole })
+        });
+
+        const contentType = response.headers.get('content-type');
+        let data;
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            throw new Error(`Server returned ${response.status}: ${text.substring(0,100)}`);
+        }
+
+        if (data.success) {
+            window.location.href = data.redirect || '/dashboard';
+        } else {
+            alert(data.message || "Invalid credentials or role mismatch.");
+        }
+    } catch (error) {
+        console.error('[Login Error]', error);
+        alert("Server connection error. Please check network or contact admin.");
+    } finally {
+        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Log in';
+        loginBtn.disabled  = false;
+    }
+});
+
+function handleKeyPress(e) { if (e.key === 'Enter') { e.preventDefault(); loginBtn.click(); } }
+usernameInput.addEventListener('keypress', handleKeyPress);
+passwordInput.addEventListener('keypress', handleKeyPress);
+
+// ========================
+// 4. REGISTER MODAL
+// ========================
+function openRegisterModal() {
+    document.getElementById('registerModal').classList.add('open');
+    document.getElementById('reg-username').focus();
+}
+
+function closeRegisterModal() {
+    document.getElementById('registerModal').classList.remove('open');
+    document.getElementById('reg-username').value = '';
+    document.getElementById('reg-password').value = '';
+    document.getElementById('reg-confirm').value  = '';
+}
+
+// Close on overlay click
+document.getElementById('registerModal').addEventListener('click', function(e) {
+    if (e.target === this) closeRegisterModal();
+});
+
+async function submitStudentRegistration() {
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value.trim();
+    const confirm  = document.getElementById('reg-confirm').value.trim();
+
+    if (!username || !password || !confirm) {
+        alert("Please fill in all fields."); return;
+    }
+    if (password !== confirm) {
+        alert("Passwords do not match."); return;
+    }
+    if (password.length < 6) {
+        alert("Password must be at least 6 characters."); return;
+    }
+
+    const btn = document.getElementById('regSubmitBtn');
+    btn.disabled  = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+
+    try {
+        /*
+         * FIX: Previously called POST /create-account which is decorated with
+         * @role_required('faculty', 'admin') and always returns 401 for
+         * unauthenticated users — breaking student self-registration entirely.
+         *
+         * Now calls the dedicated public endpoint /api/register-student-public
+         * which requires no session and only ever creates student accounts.
+         */
+        const res  = await fetch('/api/register-student-public', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            closeRegisterModal();
+            alert(`✓ Account created!\n\nStudent Number: ${username}\n\nYou can now log in. After logging in, go to My Profile to complete your registration and upload face photos.`);
+            usernameInput.value = username;
+            passwordInput.focus();
+        } else {
+            alert("Registration failed: " + (data.message || "Unknown error"));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Server error. Please try again.");
+    } finally {
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Create Student Account';
+    }
+}
+
+// Enter key in modal inputs
+['reg-username', 'reg-password', 'reg-confirm'].forEach(id => {
+    document.getElementById(id).addEventListener('keypress', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitStudentRegistration(); }
+    });
+});
+</script>
+
+</body>
+</html>

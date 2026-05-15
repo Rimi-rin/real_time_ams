@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Log | Engineering Attendance System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- jsPDF + autoTable for table-only PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body { background-color: #0d1f1a; color: #ffffff; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bg-card-dark { background-color: rgba(22, 43, 37, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .sidebar { background-color: rgba(22, 43, 37, 0.4); border-left: 1px solid rgba(255, 255, 255, 0.05); }
+
+        .nav-item-active {
+            background-color: rgba(82, 183, 136, 0.15);
+            color: #52b788;
+            border-right: 3px solid #52b788;
+            opacity: 1 !important;
+            border-radius: 8px 0 0 8px !important;
+        }
+        .nav-item { opacity: 0.8; transition: all 0.2s; border-right: 3px solid transparent; }
+        .nav-item:hover { background-color: rgba(255, 255, 255, 0.05); opacity: 1; }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3d5a52; border-radius: 10px; }
+
+        .table-container { background-color: rgba(22, 43, 37, 0.3); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; }
+        .text-emerald-custom { color: #52b788; }
+        .filter-btn-active { background-color: #52b788 !important; color: #0d1f1a !important; border-color: #52b788 !important; }
+
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+
+        @keyframes pulse-lite {
+            0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; }
+        }
+        .live-indicator { animation: pulse-lite 2s infinite; }
+    </style>
+</head>
+
+<body class="flex min-h-screen">
+
+<main class="flex-1 p-8 overflow-y-auto custom-scroll">
+    <header class="flex items-center gap-4 mb-10">
+        <div class="p-2 bg-[#52b788]/10 rounded-lg border border-white/10">
+            <i data-lucide="clipboard-list" class="text-[#52b788] w-6 h-6"></i>
+        </div>
+        <h1 class="text-2xl font-black uppercase tracking-wider">Attendance Log</h1>
+    </header>
+
+    <div class="flex flex-col lg:flex-row gap-6">
+        <div class="flex-[3] table-container overflow-hidden h-fit">
+            <div class="px-6 py-4 border-b border-white/5 bg-white/2 flex justify-between items-center">
+                <p class="text-[11px] font-bold uppercase tracking-widest opacity-80">Real-time Attendance Stream</p>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-[#52b788] rounded-full live-indicator"></span>
+                    <span class="text-[9px] font-bold uppercase text-[#52b788] tracking-tighter">Live Sync Active</span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="text-[10px] text-gray-400 uppercase font-bold border-b border-white/5">
+                        <tr>
+                            <th class="px-4 py-4">No.</th>
+                            <th class="px-4 py-4">Full Name</th>
+                            <th class="px-4 py-4">SN</th>
+                            <th class="px-4 py-4">Course</th>
+                            <th class="px-4 py-4">Year</th>
+                            <th class="px-4 py-4">Type</th>
+                            <th class="px-4 py-4 text-center">Date</th>
+                            <th class="px-4 py-4">Time In</th>
+                            <th class="px-4 py-4">Time Out</th>
+                            <th class="px-4 py-4">Status</th>
+                            <th class="px-4 py-4 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-tbody" class="text-[11px] font-semibold divide-y divide-white/5">
+                        <tr><td colspan="11" class="p-10 text-center text-gray-500 italic">Connecting to database...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex-1 space-y-6">
+            <div>
+                <h3 class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest">Attendance Actions</h3>
+                <div class="space-y-3">
+                    <button onclick="exportToExcel()" class="w-full flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg hover:bg-white/10 transition-all text-xs font-bold">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-custom"></i> Export to Excel (.xlsx)
+                    </button>
+                    <button onclick="exportToPDF()" class="w-full flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg hover:bg-white/10 transition-all text-xs font-bold">
+                        <i data-lucide="file-down" class="w-4 h-4 text-red-400"></i> Download PDF Report
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-white/5">
+                <h3 class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest">Filter by Date Range</h3>
+                <div class="space-y-3">
+                    <input type="date" id="startDate" onchange="filterRecords()" class="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-xs outline-none focus:border-[#52b788]">
+                    <input type="date" id="endDate" onchange="filterRecords()" class="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-xs outline-none focus:border-[#52b788]">
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-white/5">
+                <h3 class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest">Filter by Status</h3>
+                <div id="statusFilters" class="flex flex-wrap gap-2">
+                    <button onclick="setStatusFilter('ALL')" class="filter-btn-active px-4 py-1.5 rounded border border-white/10 text-[10px] font-black uppercase">All</button>
+                    <button onclick="setStatusFilter('PRESENT')" class="px-4 py-1.5 rounded border border-white/10 text-gray-400 text-[10px] font-black uppercase hover:bg-white/5">Present</button>
+                    <button onclick="setStatusFilter('LATE')" class="px-4 py-1.5 rounded border border-white/10 text-gray-400 text-[10px] font-black uppercase hover:bg-white/5">Late</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<aside class="w-64 sidebar flex flex-col py-4 pl-4 hidden lg:flex">
+    <div class="flex flex-col gap-1">
+        <a href="/scanner" class="nav-item flex items-center gap-3 p-3">
+            <i data-lucide="scan" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Face Scanner</span>
+        </a>
+        <a href="/dashboard" class="nav-item flex items-center gap-3 p-3">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+        </a>
+        <a href="/students" class="nav-item flex items-center gap-3 p-3">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Student Records</span>
+        </a>
+        <a href="/logs" class="nav-item-active flex items-center gap-3 p-3">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Attendance Log</span>
+        </a>
+        <a href="/schedule" class="nav-item flex items-center gap-3 p-3">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Schedule</span>
+        </a>
+        <a href="/reports" class="nav-item flex items-center gap-3 p-3">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+            <span class="text-xs font-bold uppercase tracking-widest">Report & Analytics</span>
+        </a>
+        <div class="mt-auto border-t border-white/5 pt-4 flex flex-col gap-1 pr-4">
+            <a href="/settings" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 hover:bg-white/10 transition-all">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Settings</span>
+            </a>
+            <a href="/logout" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-red-400 hover:bg-red-400/10 transition-all">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Logout</span>
+            </a>
+        </div>
+    </div>
+</aside>
+
+<script>
+    let currentStatusFilter = 'ALL';
+    let allRecords = [];
+    let currentFiltered = [];
+
+    function convertTo12Hour(timeStr) {
+        if (!timeStr || timeStr === '--:--') return '--:--';
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0], 10);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hour12 = hours % 12 || 12;
+        return `${hour12}:${minutes} ${ampm}`;
+    }
+
+    async function loadLogsFromDatabase() {
+        try {
+            const response = await fetch('/api/attendance_logs');
+            const data = await response.json();
+            if (data) {
+                processLogsWithTimeout(data);
+                filterRecords();
+            }
+        } catch (error) {
+            console.error("Error loading logs:", error);
+        }
+    }
+
+    function processLogsWithTimeout(logs) {
+        const tempRecords = {};
+        logs.forEach(r => {
+            const studentId = r.student_number || r.sn || r.student_id;
+            const logDate = r.date || new Date().toISOString().split('T')[0];
+            const uniqueKey = `${studentId}-${logDate}`;
+            // If student is absent and time_in is null, show 'N/A' instead of defaulting to 00:00
+            const rawTimeIn  = (r.status === 'Absent' && !r.time_in) ? 'N/A' : (r.time || r.time_in || '00:00');
+            const rawTimeOut = r.time_out || '--:--';
+
+            if (!tempRecords[uniqueKey]) {
+                tempRecords[uniqueKey] = {
+                    ...r,
+                    time_in:  (rawTimeIn === 'N/A') ? 'N/A' : convertTo12Hour(rawTimeIn),
+                    time_out: convertTo12Hour(rawTimeOut),
+                    db_id: r.id
+                };
+            } else {
+                tempRecords[uniqueKey].time_out = convertTo12Hour(rawTimeOut);
+                tempRecords[uniqueKey].db_id = r.id || tempRecords[uniqueKey].db_id;
+            }
+        });
+        allRecords = Object.values(tempRecords);
+    }
+
+    function renderTable(data) {
+        currentFiltered = data;
+        const tbody = document.getElementById('attendance-tbody');
+        tbody.innerHTML = data.length ? data.map((r, index) => {
+            const statusUpper = (r.status || 'PRESENT').toUpperCase();
+            const statusClass = statusUpper === 'LATE' ? 'text-orange-400' : 'text-[#52b788]';
+            const recordDbId = r.db_id || r.id;
+            const scanType = (r.time_out && r.time_out !== '--:--') ? 'Out' : 'In';
+            const typeBadge = scanType === 'In'
+                ? '<span class="text-[#52b788] bg-[#52b788]/10 px-2 py-0.5 rounded font-bold text-[9px]">IN</span>'
+                : '<span class="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded font-bold text-[9px]">OUT</span>';
+
+            return `
+                <tr class="hover:bg-white/5 transition-colors border-b border-white/5" id="row-${recordDbId}">
+                    <td class="px-4 py-4 opacity-70">${index + 1}</td>
+                    <td class="px-4 py-4">
+                        <div class="flex flex-col">
+                            <span class="uppercase font-bold">${r.name || r.full_name}</span>
+                            <span class="text-[9px] text-gray-500 uppercase">Verified Face ID</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 font-mono opacity-70">${r.student_number || r.sn || r.student_id}</td>
+                    <td class="px-4 py-4 opacity-70 uppercase text-[10px]">${r.course || 'BSCpE'}</td>
+                    <td class="px-4 py-4 opacity-70 uppercase text-[10px]">${r.year_level || r.year || '3rd Year'}</td>
+                    <td class="px-4 py-4">${typeBadge}</td>
+                    <td class="px-4 py-4 opacity-70 text-center">${r.date || new Date().toLocaleDateString()}</td>
+                    <td class="px-4 py-4 font-bold text-white">${r.time_in}</td>
+                    <td class="px-4 py-4 font-bold text-white">${r.time_out}</td>
+                    <td class="px-4 py-4 ${statusClass} font-black italic text-[10px] uppercase">${r.status || 'PRESENT'}</td>
+                    <td class="px-4 py-4 text-center">
+                        <button onclick="deleteEntry('${recordDbId}')" class="p-2 hover:bg-red-500/20 rounded-md group transition-all">
+                            <i data-lucide="trash-2" class="w-4 h-4 text-red-500 group-hover:scale-110"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        }).join('') : `<tr><td colspan="11" class="p-10 text-center text-gray-500 italic">No matching records found.</td></tr>`;
+
+        lucide.createIcons();
+    }
+
+    async function deleteEntry(id) {
+        if (confirm("Permanently delete this attendance record?")) {
+            try {
+                const response = await fetch(`/delete_log/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    allRecords = allRecords.filter(r => r.db_id != id && r.id != id);
+                    const row = document.getElementById(`row-${id}`);
+                    if (row) row.remove();
+                    filterRecords();
+                } else {
+                    alert("Could not delete record from database.");
+                }
+            } catch (e) {
+                alert("An error occurred during deletion.");
+            }
+        }
+    }
+
+    function setStatusFilter(status) {
+        currentStatusFilter = status;
+        document.querySelectorAll('#statusFilters button').forEach(btn => {
+            if (btn.innerText.toUpperCase() === status) btn.classList.add('filter-btn-active');
+            else btn.classList.remove('filter-btn-active');
+        });
+        filterRecords();
+    }
+
+    function filterRecords() {
+        const start = document.getElementById('startDate').value;
+        const end   = document.getElementById('endDate').value;
+        let filtered = [...allRecords];
+
+        if (currentStatusFilter !== 'ALL') {
+            filtered = filtered.filter(r => (r.status || 'PRESENT').toUpperCase() === currentStatusFilter);
+        }
+        if (start) filtered = filtered.filter(r => r.date >= start);
+        if (end)   filtered = filtered.filter(r => r.date <= end);
+
+        renderTable(filtered);
+    }
+
+    // ─── EXCEL EXPORT (.xlsx) ────────────────────────────────────
+    function exportToExcel() {
+        const rows = currentFiltered.map((r, i) => {
+            const scanType = (r.time_out && r.time_out !== '--:--') ? 'Out' : 'In';
+            return {
+                'No':        i + 1,
+                'Name':      r.name || r.full_name || '',
+                'Student No': r.student_number || r.sn || r.student_id || '',
+                'Course':    r.course || 'BSCpE',
+                'Year':      r.year_level || r.year || '',
+                'Type':      scanType,
+                'Date':      r.date || '',
+                'Time In':   r.time_in || '',
+                'Time Out':  r.time_out || '--:--',
+                'Status':    r.status || 'PRESENT'
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+
+        // Column widths
+        ws['!cols'] = [
+            { wch: 5  },  // No
+            { wch: 28 },  // Name
+            { wch: 16 },  // SN
+            { wch: 14 },  // Course
+            { wch: 10 },  // Year
+            { wch: 6  },  // Type
+            { wch: 14 },  // Date
+            { wch: 12 },  // Time In
+            { wch: 12 },  // Time Out
+            { wch: 10 },  // Status
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Log');
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `Attendance_Log_${dateStr}.xlsx`);
+    }
+
+    // ─── PDF EXPORT — table only, like your screenshot ───────────
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+        const PAGE_W  = doc.internal.pageSize.getWidth();
+        const PAGE_H  = doc.internal.pageSize.getHeight();
+        const MARGIN  = 10;
+        const generated = new Date().toLocaleString('en-PH');
+
+        // ── date range / filter labels ──
+        const startDate = document.getElementById('startDate').value;
+        const endDate   = document.getElementById('endDate').value;
+        const rangeLabel = (startDate && endDate)
+            ? `${startDate} to ${endDate}`
+            : startDate ? `From ${startDate}` : endDate ? `To ${endDate}` : 'All Dates';
+        const statusLabel = currentStatusFilter === 'ALL' ? 'All Statuses' : currentStatusFilter;
+
+        // ── header block ──
+        doc.setFillColor(13, 31, 26);        // dark green bg
+        doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+
+        doc.setTextColor(82, 183, 136);      // emerald
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ATTENDANCE LOG REPORT', MARGIN, 14);
+
+        doc.setFontSize(8);
+        doc.setTextColor(160, 200, 180);
+        doc.text(`Generated: ${generated}   |   Date Range: ${rangeLabel}   |   Status: ${statusLabel}   |   Records: ${currentFiltered.length}`, MARGIN, 20);
+
+        // ── thin accent line ──
+        doc.setDrawColor(82, 183, 136);
+        doc.setLineWidth(0.4);
+        doc.line(MARGIN, 23, PAGE_W - MARGIN, 23);
+
+        // ── build table rows ──
+        const tableBody = currentFiltered.map((r, i) => {
+            const scanType = (r.time_out && r.time_out !== '--:--') ? 'OUT' : 'IN';
+            return [
+                i + 1,
+                (r.name || r.full_name || '').toUpperCase(),
+                r.student_number || r.sn || r.student_id || '',
+                r.course || 'BSCpE',
+                r.year_level || r.year || '',
+                scanType,
+                r.date || '',
+                r.time_in || '',
+                r.time_out || '--:--',
+                (r.status || 'PRESENT').toUpperCase()
+            ];
+        });
+
+        doc.autoTable({
+            startY: 26,
+            head: [['#', 'Full Name', 'Student No.', 'Course', 'Year', 'Type', 'Date', 'Time In', 'Time Out', 'Status']],
+            body: tableBody.length ? tableBody : [['', 'No records found.', '', '', '', '', '', '', '', '']],
+            theme: 'grid',
+            margin: { left: MARGIN, right: MARGIN },
+
+            headStyles: {
+                fillColor:  [27, 79, 55],
+                textColor:  [82, 183, 136],
+                fontStyle:  'bold',
+                fontSize:   7.5,
+                cellPadding: 3
+            },
+            bodyStyles: {
+                fillColor:  [18, 38, 30],
+                textColor:  [210, 235, 220],
+                fontSize:   8,
+                cellPadding: 2.5
+            },
+            alternateRowStyles: {
+                fillColor: [22, 45, 36]
+            },
+
+            // Per-cell colour for Type and Status columns
+            didParseCell: (data) => {
+                if (data.section !== 'body') return;
+                const col = data.column.index;
+                const val = String(data.cell.raw || '');
+
+                // Type column (index 5): IN = green, OUT = amber
+                if (col === 5) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.textColor = val === 'IN'
+                        ? [52, 183, 136]
+                        : [251, 192, 45];
+                }
+
+                // Status column (index 9)
+                if (col === 9) {
+                    data.cell.styles.fontStyle = 'bolditalic';
+                    if (val === 'PRESENT' || val === 'ON-TIME') data.cell.styles.textColor = [52, 183, 136];
+                    else if (val === 'LATE')   data.cell.styles.textColor = [251, 192, 45];
+                    else if (val === 'ABSENT') data.cell.styles.textColor = [217, 48, 37];
+                }
+            },
+
+            // Re-paint bg + footer on every auto-generated page
+            didDrawPage: (data) => {
+                // re-fill bg for continuation pages
+                doc.setFillColor(13, 31, 26);
+
+                // Footer
+                doc.setFontSize(7);
+                doc.setTextColor(100, 150, 130);
+                const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
+                const totalPages = doc.internal.getNumberOfPages();
+                doc.text(
+                    `Attendance Log  |  ${generated}  |  Page ${pageNum}`,
+                    PAGE_W / 2,
+                    PAGE_H - 5,
+                    { align: 'center' }
+                );
+            },
+
+            columnStyles: {
+                0: { cellWidth: 8,  halign: 'center' },  // #
+                1: { cellWidth: 50 },                     // Name
+                2: { cellWidth: 26 },                     // SN
+                3: { cellWidth: 22 },                     // Course
+                4: { cellWidth: 16 },                     // Year
+                5: { cellWidth: 12, halign: 'center' },   // Type
+                6: { cellWidth: 22, halign: 'center' },   // Date
+                7: { cellWidth: 20, halign: 'center' },   // Time In
+                8: { cellWidth: 20, halign: 'center' },   // Time Out
+                9: { cellWidth: 18, halign: 'center' },   // Status
+            }
+        });
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        doc.save(`Attendance_Log_${dateStr}.pdf`);
+    }
+
+    // Init
+    lucide.createIcons();
+    loadLogsFromDatabase();
+    setInterval(loadLogsFromDatabase, 3000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - Attendance System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(to right, #0f3d3e, #3a7d6b);
+            --card-bg: rgba(0,0,0,0.2);
+            --text-color: #d9f0d9;
+            --input-bg: #e6f0e6;
+            --input-text: #0b2f30;
+            --input-border: #88b089;
+            --btn-bg: #4fa16b;
+            --btn-hover: #3e8e58;
+            --role-btn-bg: rgba(255,255,255,0.15);
+            --role-border: #88b089;
+            --role-active-bg: #4fa16b;
+            --role-active-text: white;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .box {
+            background: var(--card-bg);
+            backdrop-filter: blur(4px);
+            padding: 32px 35px;
+            border-radius: 28px;
+            width: 420px;
+            text-align: center;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.2);
+        }
+
+        .icon-circle {
+            width: 70px; height: 70px;
+            background: #1f5c4d;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px;
+        }
+        .icon-circle i { font-size: 32px; color: var(--text-color); }
+
+        h2 { margin: 0 0 6px 0; font-weight: 700; letter-spacing: 0.5px; }
+
+        .session-role-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: rgba(79,161,107,0.2);
+            border: 1px solid rgba(79,161,107,0.4);
+            border-radius: 20px;
+            padding: 3px 12px;
+            color: #88e09a;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%; padding: 12px 16px; margin: 10px 0;
+            border-radius: 40px; border: 1px solid var(--input-border);
+            background: var(--input-bg); color: var(--input-text);
+            font-size: 14px; outline: none; box-sizing: border-box; transition: 0.2s;
+        }
+        input:focus {
+            border-color: var(--btn-bg);
+            box-shadow: 0 0 0 2px rgba(79,161,107,0.3);
+        }
+
+        .role-section { margin: 16px 0 12px; text-align: left; }
+        .role-label {
+            font-size: 13px; font-weight: 600; margin-bottom: 10px;
+            display: block; letter-spacing: 0.3px;
+        }
+        .role-buttons-group {
+            display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        .role-btn {
+            flex: 1; min-width: 90px;
+            background: var(--role-btn-bg); border: 1.5px solid var(--role-border);
+            color: var(--text-color); padding: 9px 6px; border-radius: 40px;
+            font-weight: 600; font-size: 13px; cursor: pointer;
+            transition: all 0.2s ease; text-align: center;
+        }
+        .role-btn i { margin-right: 5px; font-size: 12px; }
+        .role-btn.active {
+            background: var(--role-active-bg); border-color: var(--role-active-bg);
+            color: var(--role-active-text); box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .role-btn:not(.active):hover {
+            background: rgba(79,161,107,0.3); border-color: var(--btn-bg);
+        }
+        .role-btn:disabled, .role-btn[style*="none"] {
+            display: none;
+        }
+
+        /* Info notes under role buttons */
+        .role-note {
+            font-size: 11px; color: #88b089; margin-top: 10px;
+            font-style: italic; text-align: left; line-height: 1.5;
+            background: rgba(79,161,107,0.08);
+            border: 1px solid rgba(79,161,107,0.2);
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+        .role-note i { margin-right: 4px; }
+
+        /* Student-number hint */
+        .student-hint {
+            display: none;
+            font-size: 11px;
+            background: rgba(79,161,107,0.12);
+            border: 1px solid rgba(79,161,107,0.25);
+            border-radius: 10px;
+            padding: 9px 13px;
+            color: rgba(217,240,217,0.8);
+            text-align: left;
+            margin: 4px 0 8px;
+            line-height: 1.5;
+        }
+        .student-hint i { color: #4fa16b; margin-right: 5px; }
+
+        .btn {
+            width: 100%; padding: 12px; border-radius: 40px; border: none;
+            background: var(--btn-bg); color: white; cursor: pointer;
+            font-size: 16px; font-weight: bold; transition: 0.2s; margin-top: 10px;
+        }
+        .btn:hover { background: var(--btn-hover); transform: scale(1.01); }
+        .btn:disabled { background: #88b089; cursor: not-allowed; transform: none; }
+
+        .back-link {
+            color: var(--text-color); font-size: 13px;
+            display: inline-block; margin-top: 18px;
+            text-decoration: underline; cursor: pointer; opacity: 0.7;
+        }
+        .back-link:hover { opacity: 1; }
+
+        /* Success flash */
+        .success-flash {
+            display: none;
+            background: rgba(79,161,107,0.15);
+            border: 1px solid rgba(79,161,107,0.4);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #88e09a;
+            margin-top: 12px;
+            text-align: left;
+            animation: flashIn 0.3s ease;
+        }
+        @keyframes flashIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+<div class="box">
+    <div class="icon-circle">
+        <i class="fas fa-user-plus"></i>
+    </div>
+    <h2>Create Account</h2>
+    <div class="session-role-tag" id="sessionRoleTag">Loading...</div>
+
+    <div id="studentHint" class="student-hint">
+        <i class="fas fa-circle-info"></i>
+        <strong>For student accounts:</strong> use the student number as the username (e.g. C230238).
+        The student will complete their profile after first login.
+    </div>
+
+    <input type="text"     id="regUser" placeholder="Username"         autocomplete="off">
+    <input type="password" id="regPass" placeholder="Password"         autocomplete="new-password">
+
+    <div class="role-section">
+        <div class="role-label"><i class="fas fa-tag"></i> Account type</div>
+        <div class="role-buttons-group" id="roleButtonsContainer">
+            <button type="button" data-role="student" class="role-btn active" id="roleStudentBtn">
+                <i class="fas fa-graduation-cap"></i> Student
+            </button>
+            <button type="button" data-role="faculty" class="role-btn" id="roleFacultyBtn">
+                <i class="fas fa-chalkboard-user"></i> Faculty
+            </button>
+            <button type="button" data-role="admin" class="role-btn" id="roleAdminBtn">
+                <i class="fas fa-shield-alt"></i> Admin
+            </button>
+        </div>
+        <p class="role-note" id="roleNote" style="display:none;"></p>
+    </div>
+
+    <button class="btn" id="regBtn">
+        <i class="fas fa-user-plus"></i> Create Account
+    </button>
+
+    <div class="success-flash" id="successFlash"></div>
+
+    <br>
+    <a class="back-link" href="/dashboard">← Back to Dashboard</a>
+</div>
+
+<script>
+    const regBtn      = document.getElementById('regBtn');
+    const usernameInp = document.getElementById('regUser');
+    const passwordInp = document.getElementById('regPass');
+    const noteEl      = document.getElementById('roleNote');
+    const hintEl      = document.getElementById('studentHint');
+
+    const roleStudent = document.getElementById('roleStudentBtn');
+    const roleFaculty = document.getElementById('roleFacultyBtn');
+    const roleAdmin   = document.getElementById('roleAdminBtn');
+    const allBtns     = [roleStudent, roleFaculty, roleAdmin];
+
+    let selectedRole  = 'student';
+    let sessionRole   = null;
+
+    function setActiveRole(val, btn) {
+        allBtns.forEach(b => b && b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        selectedRole = val;
+
+        // Update placeholder and hint for student
+        if (val === 'student') {
+            usernameInp.placeholder = 'Student Number (e.g. C230238)';
+            hintEl.style.display    = 'block';
+        } else {
+            usernameInp.placeholder = 'Username';
+            hintEl.style.display    = 'none';
+        }
+    }
+
+    roleStudent.addEventListener('click', () => setActiveRole('student', roleStudent));
+    roleFaculty.addEventListener('click', () => setActiveRole('faculty', roleFaculty));
+    roleAdmin.addEventListener('click',   () => setActiveRole('admin',   roleAdmin));
+
+    // ── On load: apply role restrictions ────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const res  = await fetch('/api/session-info');
+            const sess = await res.json();
+
+            if (!sess.logged_in) { window.location.href = '/'; return; }
+            if (sess.role === 'student') { window.location.href = '/dashboard'; return; }
+
+            sessionRole = sess.role;
+            const tag   = document.getElementById('sessionRoleTag');
+            tag.textContent = `Logged in as: ${sess.username} (${sess.role})`;
+
+            if (sess.role === 'faculty') {
+                // Faculty: can create Student and Faculty — hide Admin
+                roleAdmin.style.display = 'none';
+                noteEl.innerHTML = '<i class="fas fa-circle-info"></i> As <strong>Faculty</strong>, you can create Student and Faculty accounts.';
+                noteEl.style.display = 'block';
+
+            } else if (sess.role === 'admin') {
+                // Admin: all three — show note
+                noteEl.innerHTML = '<i class="fas fa-circle-info"></i> As <strong>Admin</strong>, you can create Student, Faculty, and Admin accounts.';
+                noteEl.style.display = 'block';
+            }
+
+            // Default to student active
+            setActiveRole('student', roleStudent);
+
+        } catch (err) {
+            console.error('Session check failed:', err);
+            window.location.href = '/';
+        }
+    });
+
+    // ── Submit ───────────────────────────────────────────────────────────────
+    regBtn.addEventListener('click', async () => {
+        const username = usernameInp.value.trim();
+        const password = passwordInp.value.trim();
+
+        if (!username || !password) { alert("Please fill in all fields."); return; }
+        if (password.length < 6)    { alert("Password must be at least 6 characters."); return; }
+
+        // Guard: faculty cannot create admin
+        if (sessionRole === 'faculty' && selectedRole === 'admin') {
+            alert("Faculty cannot create admin accounts."); return;
+        }
+
+        regBtn.disabled   = true;
+        regBtn.innerHTML  = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        try {
+            const res  = await fetch('/create-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, role: selectedRole })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Show success flash
+                const flash = document.getElementById('successFlash');
+                flash.innerHTML = `<i class="fas fa-check-circle" style="color:#4fa16b;margin-right:6px;"></i>
+                    <strong>${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}</strong> account created successfully!
+                    ${selectedRole === 'student' ? `<br><small style="opacity:0.7;">Student Number: <strong>${username}</strong></small>` : ''}`;
+                flash.style.display = 'block';
+
+                // Reset form
+                usernameInp.value = '';
+                passwordInp.value = '';
+                setActiveRole('student', roleStudent);
+
+                // Hide flash after 5 seconds
+                setTimeout(() => { flash.style.display = 'none'; }, 5000);
+            } else {
+                alert("Failed: " + (data.message || "Unknown error"));
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Server error. Please try again.");
+        } finally {
+            regBtn.disabled  = false;
+            regBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+        }
+    });
+
+    [usernameInp, passwordInp].forEach(el => {
+        el.addEventListener('keypress', e => { if (e.key === 'Enter') regBtn.click(); });
+    });
+</script>
+</body>
+</html>

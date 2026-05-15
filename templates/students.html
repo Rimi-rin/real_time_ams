@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Records | Engineering Attendance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        [x-cloak] { display: none !important; }
+        body { 
+            background-color: #0d1f1a; 
+            color: #ffffff; 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden; 
+        }
+        .bg-card-glass { 
+            background-color: rgba(22, 43, 37, 0.6); 
+            backdrop-filter: blur(8px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        .sidebar { 
+            background-color: rgba(22, 43, 37, 0.4); 
+            border-left: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        .text-emerald-custom { color: #52b788; }
+        .bg-emerald-custom { background-color: #52b788; }
+        
+        .nav-item-active { 
+            background-color: rgba(82, 183, 136, 0.15); 
+            color: #52b788; 
+            position: relative;
+        }
+        .nav-item-active::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: #52b788;
+        }
+
+        .input-dark { 
+            background-color: rgba(0, 0, 0, 0.2); 
+            border: 1px solid rgba(82, 183, 136, 0.3); 
+            color: white; 
+        }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3d5a52; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex min-h-screen" x-data="studentManager()" x-init="init()">
+
+    <main class="flex-1 p-6 overflow-y-auto">
+        <header class="flex items-center gap-3 mb-8">
+            <div class="p-2 bg-emerald-custom/10 rounded-lg">
+                <i data-lucide="users" class="text-emerald-custom w-6 h-6"></i>
+            </div>
+            <h1 class="text-xl font-black uppercase tracking-widest">Student Records Management</h1>
+        </header>
+
+        <div class="bg-card-glass rounded-2xl p-4 mb-6">
+            <div class="flex justify-between items-center mb-3">
+                <p class="text-[10px] text-emerald-custom uppercase font-bold tracking-widest">Search and Filters</p>
+            </div>
+            <div class="flex flex-wrap gap-3 items-end">
+                <div class="flex-1 min-w-[200px]">
+                    <input type="text" x-model="search" placeholder="Search by Name or Student Number..." 
+                        class="w-full bg-black/20 border border-white/5 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-emerald-custom transition-all">
+                </div>
+                
+                <select x-model="courseFilter" class="bg-black/20 border border-white/5 rounded-lg px-4 py-2 text-sm focus:outline-none w-48 text-gray-300">
+                    <template x-for="course in courses" :key="course">
+                        <option :value="course" x-text="course" class="bg-[#0d1f1a]"></option>
+                    </template>
+                </select>
+
+                <select x-model="yearFilter" class="bg-black/20 border border-white/5 rounded-lg px-4 py-2 text-sm focus:outline-none w-36 text-gray-300">
+                    <template x-for="year in years" :key="year">
+                        <option :value="year" x-text="year" class="bg-[#0d1f1a]"></option>
+                    </template>
+                </select>
+
+                <button @click="resetFilters()" 
+                    class="flex items-center gap-2 bg-white/5 border border-white/10 px-5 py-2 rounded-lg text-xs font-bold uppercase hover:bg-white/10 transition">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-9 bg-card-glass rounded-2xl overflow-hidden">
+                <div class="bg-emerald-custom/5 border-b border-white/5 px-4 py-3 flex justify-between items-center">
+                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-70">Engineering Student Database</p>
+                    <div x-show="isLoading" class="text-[10px] text-emerald-custom animate-pulse">LOADING...</div>
+                </div>
+
+                <div class="overflow-x-auto custom-scroll">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-black/20 text-gray-400 uppercase font-bold tracking-widest">
+                            <tr>
+                                <th class="p-4">No.</th>
+                                <th class="p-4">Photo</th>
+                                <th class="p-4">Full Name</th>
+                                <th class="p-4">Student Number</th>
+                                <th class="p-4">Course</th>
+                                <th class="p-4">Year</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            <template x-if="filteredStudents().length === 0">
+                                <tr>
+                                    <td colspan="6" class="p-10 text-center text-gray-500 italic">No students found.</td>
+                                </tr>
+                            </template>
+                            
+                            <template x-for="(student, index) in filteredStudents()" :key="student.student_number || student.student_no">
+                                <tr @click="selectStudent(student)" 
+                                    :class="(selectedStudent && (selectedStudent.student_number === student.student_number || selectedStudent.student_no === student.student_no)) ? 'bg-emerald-custom/10 border-l-4 border-emerald-custom' : ''"
+                                    class="hover:bg-white/5 transition-all cursor-pointer">
+                                    <td class="p-4 text-gray-500" x-text="index + 1"></td>
+                                    <td class="p-4">
+                                        <div class="w-10 h-10 rounded-full bg-emerald-custom/20 border border-emerald-custom/30 overflow-hidden shadow-inner flex items-center justify-center text-emerald-custom font-bold text-xs">
+                                            <img :src="student.display_photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3Ccircle cx=%2250%22 cy=%2235%22 r=%2220%22 fill=%22%23999%22/%3E%3Cpath d=%22M 30 60 Q 50 45 70 60 L 70 100 L 30 100 Z%22 fill=%22%23999%22/%3E%3C/svg%3E'" 
+                                                 class="w-full h-full object-cover" 
+                                                 @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3Ccircle cx=%2250%22 cy=%2235%22 r=%2220%22 fill=%22%23999%22/%3E%3Cpath d=%22M 30 60 Q 50 45 70 60 L 70 100 L 30 100 Z%22 fill=%22%23999%22/%3E%3C/svg%3E'">
+                                        </div>
+                                    </td>
+                                    <td class="p-4 font-bold uppercase" x-text="student.name || student.full_name"></td>
+                                    <td class="p-4 text-gray-400" x-text="student.student_number || student.student_no"></td>
+                                    <td class="p-4 text-gray-400" x-text="student.course || 'N/A'"></td>
+                                    <td class="p-4 text-gray-400" x-text="student.year || 'N/A'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3">
+                <div class="bg-card-glass rounded-2xl p-5 border border-white/5">
+                    <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-custom/80 mb-5">Student Record Actions</h2>
+                    <div class="flex flex-col gap-3">
+                        <button :disabled="!selectedStudent" @click="openEditModal()" class="w-full flex items-center gap-4 px-4 py-3.5 bg-black/20 border border-white/5 rounded-xl text-[10px] font-bold uppercase hover:bg-emerald-custom/10 disabled:opacity-50 transition group text-left">
+                            <i data-lucide="pencil" class="w-4 h-4 text-gray-400 group-hover:text-emerald-custom"></i>
+                            <span class="text-gray-300 group-hover:text-white">Edit Selected Record</span>
+                        </button>
+                        <button :disabled="!selectedStudent" @click="showProfile = true" class="w-full flex items-center gap-4 px-4 py-3.5 bg-black/20 border border-white/5 rounded-xl text-[10px] font-bold uppercase hover:bg-emerald-custom/10 disabled:opacity-50 transition group text-left">
+                            <i data-lucide="user-circle" class="w-4 h-4 text-gray-400 group-hover:text-emerald-custom"></i>
+                            <span class="text-gray-300 group-hover:text-white">View Full Profile</span>
+                        </button>
+                        <button :disabled="!selectedStudent" @click="deleteStudent()" class="w-full flex items-center gap-4 px-4 py-3.5 bg-red-900/20 border border-red-500/20 rounded-xl text-[10px] font-bold uppercase hover:bg-red-600/40 disabled:opacity-50 transition group text-left">
+                            <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
+                            <span class="text-red-200">Delete Selected Record</span>
+                        </button>
+                        <button @click="openCreateModal()" class="w-full flex items-center gap-4 px-4 py-4 bg-emerald-custom text-[#0d1f1a] rounded-xl text-[10px] font-black uppercase hover:opacity-90 transition shadow-lg mt-4">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                            <span>Create New Student</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <aside class="w-64 sidebar flex flex-col p-4 hidden lg:flex">
+        <div class="flex flex-col gap-1">
+            <a href="/scanner" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 transition-all hover:bg-white/10">
+                <i data-lucide="scan" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Face Scanner</span>
+            </a>
+            <a href="/dashboard" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 transition-all hover:bg-white/10">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+            </a>
+            <a href="/students" class="nav-item-active flex items-center gap-3 p-3 rounded-lg cursor-pointer">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Student Records</span>
+            </a>
+            <a href="/logs" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 transition-all hover:bg-white/10">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Attendance Log</span>
+            </a>
+            <a href="/schedule" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 transition-all hover:bg-white/10">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Schedule</span>
+            </a>
+            <a href="/reports" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 transition-all hover:bg-white/10">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Report & Analytics</span>
+            </a>
+            <div class="mt-auto border-t border-white/5 pt-4 flex flex-col gap-1">
+                <a href="/settings" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer opacity-80 hover:bg-white/10 transition-all">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-widest">Settings</span>
+                </a>
+                <a href="/logout" class="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-red-400 hover:bg-red-400/10 transition-all">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-widest">Logout</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <div x-show="showModal" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div @click.away="closeModal()" class="bg-[#162b25] border border-emerald-custom/20 rounded-2xl w-full max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                <h3 class="text-sm font-black uppercase tracking-widest" x-text="isEditing ? 'Edit Student Record' : 'Create New Student Record'"></h3>
+                <button @click="closeModal()" class="text-gray-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-8 grid grid-cols-2 gap-6">
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Full Name</label>
+                    <input type="text" x-model="form.full_name" placeholder="Last Name, First Name" class="input-dark rounded-lg px-4 py-3 text-sm">
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Student Number</label>
+                    <input type="text" x-model="form.student_number" placeholder="e.g. C230238" class="input-dark rounded-lg px-4 py-3 text-sm" :disabled="isEditing">
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Course</label>
+                    <select x-model="form.course" class="input-dark rounded-lg px-4 py-3 text-sm">
+                        <option value="">Select Course</option>
+                        <option value="BS Computer Engineering">BS Computer Engineering</option>
+                        <option value="BS Civil Engineering">BS Civil Engineering</option>
+                        <option value="BS Mechanical Engineering">BS Mechanical Engineering</option>
+                        <option value="BS Electrical Engineering">BS Electrical Engineering</option>
+                        <option value="BS Electronics Engineering">BS Electronics Engineering</option>
+                        <option value="BS Industrial Engineering">BS Industrial Engineering</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Year Level</label>
+                    <select x-model="form.year" class="input-dark rounded-lg px-4 py-3 text-sm">
+                        <option value="">Select Year</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                    </select>
+                </div>
+
+                <div class="col-span-2 flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Profile Display Photo</label>
+                    <input type="file" id="profile_image" accept="image/*" class="input-dark rounded-lg px-4 py-2 text-xs file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-custom file:text-[#0d1f1a] hover:file:bg-opacity-80">
+            
+                </div>
+
+                <div class="col-span-2 flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-emerald-custom">Training Dataset (Upload 8 Photos)</label>
+                    <input type="file" id="student_images" accept="image/*" multiple class="input-dark rounded-lg px-4 py-2 text-xs file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-custom file:text-[#0d1f1a] hover:file:bg-opacity-80">
+        
+                </div>
+            </div>
+            
+            <div class="p-6 bg-black/20 flex justify-end gap-3 rounded-b-2xl">
+                <button @click="closeModal()" class="px-6 py-2.5 rounded-lg text-[10px] font-black uppercase border border-white/10 hover:bg-white/5">Cancel</button>
+                <button @click="saveStudent()" :disabled="isLoading" class="flex items-center gap-2 px-6 py-2.5 bg-emerald-custom text-black rounded-lg text-[10px] font-black uppercase hover:opacity-90 transition disabled:opacity-50">
+                    <template x-if="!isLoading">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                    </template>
+                    <span x-text="isLoading ? 'Processing...' : (isEditing ? 'Update Record' : 'Save Record')"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showProfile" x-cloak class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div @click.away="showProfile = false" class="bg-[#0d1f1a] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="h-32 bg-gradient-to-r from-emerald-900 to-emerald-700 relative">
+                <button @click="showProfile = false" class="absolute top-4 right-4 bg-black/20 p-2 rounded-full hover:bg-black/40"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="px-8 pb-8 -mt-12 relative">
+                <div class="w-24 h-24 rounded-2xl bg-[#162b25] border-4 border-[#0d1f1a] overflow-hidden mb-4 shadow-xl flex items-center justify-center">
+                    <img :src="selectedStudent?.display_photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3Ccircle cx=%2250%22 cy=%2235%22 r=%2220%22 fill=%22%23999%22/%3E%3Cpath d=%22M 30 60 Q 50 45 70 60 L 70 100 L 30 100 Z%22 fill=%22%23999%22/%3E%3C/svg%3E'" 
+                         class="w-full h-full object-cover" 
+                         @error="$el.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3Ccircle cx=%2250%22 cy=%2235%22 r=%2220%22 fill=%22%23999%22/%3E%3Cpath d=%22M 30 60 Q 50 45 70 60 L 70 100 L 30 100 Z%22 fill=%22%23999%22/%3E%3C/svg%3E'">
+                </div>
+                <h2 class="text-2xl font-black uppercase tracking-tight" x-text="selectedStudent?.name || selectedStudent?.full_name"></h2>
+                <p class="text-emerald-custom font-bold text-sm mb-6" x-text="selectedStudent?.student_number || selectedStudent?.student_no"></p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <p class="text-[9px] uppercase opacity-50 font-bold mb-1">Course</p>
+                        <p class="text-xs font-bold" x-text="selectedStudent?.course || 'N/A'"></p>
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <p class="text-[9px] uppercase opacity-50 font-bold mb-1">Year Level</p>
+                        <p class="text-xs font-bold" x-text="selectedStudent?.year || 'N/A'"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function studentManager() {
+            return {
+                students: [],
+                isLoading: false,
+                search: '',
+                courseFilter: 'All Courses',
+                yearFilter: 'All Years',
+                showModal: false,
+                showProfile: false,
+                isEditing: false,
+                selectedStudent: null,
+                form: { full_name: '', student_number: '', course: '', year: '' },
+                courses: ["All Courses", "BS Computer Engineering", "BS Civil Engineering", "BS Mechanical Engineering", 
+                          "BS Electrical Engineering", "BS Electronics Engineering", "BS Industrial Engineering"],
+                years: ["All Years", "1st Year", "2nd Year", "3rd Year", "4th Year"],
+
+                async init() {
+                    lucide.createIcons();
+                    await this.fetchStudents();
+                },
+
+                async fetchStudents() {
+                    this.isLoading = true;
+                    try {
+                        const res = await fetch('/api/get_students');
+                        if (res.ok) { 
+                            this.students = await res.json(); 
+                        }
+                    } catch (e) { 
+                        console.error("Failed to fetch students:", e); 
+                    } finally { 
+                        this.isLoading = false; 
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+
+                filteredStudents() {
+                    return this.students.filter(s => {
+                        const sName = s.name || s.full_name || "";
+                        const sNo = s.student_number || s.student_no || "";
+                        
+                        const matchSearch = !this.search || 
+                            sName.toLowerCase().includes(this.search.toLowerCase()) ||
+                            sNo.includes(this.search);
+                            
+                        const matchCourse = this.courseFilter === "All Courses" || s.course === this.courseFilter;
+                        const matchYear = this.yearFilter === "All Years" || s.year === this.yearFilter;
+                        
+                        return matchSearch && matchCourse && matchYear;
+                    });
+                },
+
+                selectStudent(student) { 
+                    this.selectedStudent = student; 
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openCreateModal() { 
+                    this.isEditing = false; 
+                    this.form = { full_name: '', student_number: '', course: '', year: '' }; 
+                    if(document.getElementById('student_images')) document.getElementById('student_images').value = '';
+                    if(document.getElementById('profile_image')) document.getElementById('profile_image').value = '';
+                    this.showModal = true; 
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openEditModal() {
+                    if (!this.selectedStudent) return;
+                    this.isEditing = true;
+                    this.form = { 
+                        full_name: this.selectedStudent.name || this.selectedStudent.full_name || "", 
+                        student_number: this.selectedStudent.student_no || this.selectedStudent.student_number || "", 
+                        course: this.selectedStudent.course || '', 
+                        year: this.selectedStudent.year || '' 
+                    };
+                    if(document.getElementById('student_images')) document.getElementById('student_images').value = '';
+                    if(document.getElementById('profile_image')) document.getElementById('profile_image').value = '';
+                    this.showModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                closeModal() { 
+                    this.showModal = false; 
+                },
+
+                async saveStudent() {
+                    const imageInput = document.getElementById('student_images');
+                    const profileInput = document.getElementById('profile_image');
+                    
+                    if (!this.form.full_name || !this.form.student_number) {
+                        alert("Please fill in Name and Student Number.");
+                        return;
+                    }
+
+                    if (!this.isEditing && imageInput.files.length !== 8) {
+                        alert("Please upload exactly 8 images for face recognition training.");
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    const formData = new FormData();
+                    formData.append('full_name', this.form.full_name);
+                    formData.append('student_number', this.form.student_number);
+                    formData.append('course', this.form.course);
+                    formData.append('year', this.form.year);
+
+                    if (profileInput.files.length > 0) {
+                        formData.append('profile_image', profileInput.files[0]);
+                    }
+
+                    if (imageInput.files.length === 8) {
+                        for (let i = 0; i < 8; i++) {
+                            formData.append('training_images', imageInput.files[i]);
+                        }
+                    }
+
+                    try {
+                        const endpoint = this.isEditing ? '/api/update_student' : '/api/register_student';
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            alert(result.message);
+                            this.closeModal();
+                            await this.fetchStudents();
+                            this.selectedStudent = null;
+                        } else {
+                            alert("Failed: " + result.message);
+                        }
+                    } catch (e) {
+                        alert("Server connection error.");
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async deleteStudent() {
+                    const studentIdentifier = this.selectedStudent?.student_no || this.selectedStudent?.student_number;
+                    const studentName = this.selectedStudent?.name || this.selectedStudent?.full_name;
+                    
+                    if (!this.selectedStudent) return;
+                    
+                    if (!confirm(`Delete student ${studentName}?`)) return;
+                    
+                    try {
+                        const response = await fetch(`/api/delete_student/${studentIdentifier}`, { 
+                            method: 'DELETE' 
+                        });
+                        
+                        if (response.ok) { 
+                            alert('Student deleted successfully');
+                            await this.fetchStudents(); 
+                            this.selectedStudent = null;
+                            this.$nextTick(() => lucide.createIcons());
+                        } else {
+                            const err = await response.json();
+                            alert("Error: " + err.message);
+                        }
+                    } catch (e) { 
+                        alert("Error deleting record: " + e.message); 
+                    }
+                },
+
+                resetFilters() {
+                    this.search = '';
+                    this.courseFilter = 'All Courses';
+                    this.yearFilter = 'All Years';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

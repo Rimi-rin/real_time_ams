@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Engineering Attendance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0d1f1a; color: #ffffff; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bg-card { background-color: rgba(22, 43, 37, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .sidebar { background-color: rgba(22, 43, 37, 0.4); border-left: 1px solid rgba(255, 255, 255, 0.05); }
+        .text-emerald-custom { color: #52b788; }
+        .bg-emerald-custom { background-color: #52b788; }
+
+        .nav-item { opacity: 0.8; transition: all 0.2s; }
+        .nav-item:hover { background-color: rgba(255, 255, 255, 0.05); opacity: 1; }
+
+        .nav-item-active {
+            position: relative;
+            background-color: rgba(82, 183, 136, 0.15);
+            color: #52b788;
+            opacity: 1 !important;
+        }
+        .nav-item-active::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 3px;
+            height: 100%;
+            background-color: #52b788;
+            border-radius: 2px;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3d5a52; border-radius: 10px; }
+
+        .mirror { transform: scaleX(-1); }
+
+        @keyframes flash-green {
+            0% { background-color: rgba(82, 183, 136, 0.4); }
+            100% { background-color: transparent; }
+        }
+        .new-row-flash { animation: flash-green 2s ease-out; }
+
+        /*
+         * Role-visibility classes.
+         * All hidden by default; JS reveals them after the session role is confirmed.
+         * faculty-admin-only: shown for faculty and admin roles
+         * admin-only:         shown for admin role only
+         * student-only:       shown for student role only
+         *
+         * NOTE: The Face Scanner nav link is faculty-admin-only.
+         *       Students never see or access the scanner kiosk page.
+         */
+        .admin-only         { display: none; }
+        .faculty-admin-only { display: none; }
+        .student-only       { display: none; }
+
+        /* Student portal CTA card */
+        .portal-cta {
+            background: linear-gradient(135deg, rgba(82,183,136,0.12) 0%, rgba(82,183,136,0.04) 100%);
+            border: 1px solid rgba(82,183,136,0.25);
+            transition: all 0.2s;
+        }
+        .portal-cta:hover {
+            background: linear-gradient(135deg, rgba(82,183,136,0.2) 0%, rgba(82,183,136,0.08) 100%);
+            border-color: rgba(82,183,136,0.45);
+            transform: translateY(-1px);
+        }
+        .portal-btn {
+            background: #52b788;
+            color: #0d1f1a;
+            font-weight: 800;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 8px 20px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: opacity 0.15s;
+        }
+        .portal-btn:hover { opacity: 0.85; }
+
+        .portal-pill {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: rgba(82,183,136,0.15);
+            color: #52b788;
+            border: 1px solid rgba(82,183,136,0.3);
+            border-radius: 20px;
+            padding: 3px 10px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        /* Not-registered warning */
+        .not-registered {
+            background: rgba(251,191,36,0.06);
+            border: 1px dashed rgba(251,191,36,0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            color: rgba(251,191,36,0.85);
+        }
+    </style>
+</head>
+<body class="flex min-h-screen">
+
+    <main class="flex-1 p-8 overflow-y-auto custom-scroll">
+        <header class="flex items-center gap-4 mb-10">
+            <div class="p-2 bg-[#52b788]/10 rounded-lg border border-white/10">
+                <i data-lucide="layout-dashboard" class="text-[#52b788] w-6 h-6"></i>
+            </div>
+            <h1 class="text-2xl font-black uppercase tracking-wider">Dashboard</h1>
+            <span id="role-badge" class="ml-auto text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-white/10 text-gray-400"></span>
+        </header>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             STUDENT VIEW
+        ═══════════════════════════════════════════════════════════════════ -->
+        <div id="student-view" class="hidden">
+
+            <!-- Not-registered warning -->
+            <div id="not-registered-warn" class="not-registered mb-6 hidden">
+                <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0" style="color:#fbbf24;"></i>
+                <span>You haven't registered your student profile yet. Face recognition attendance won't work until you do.
+                    <a href="/student-portal" class="underline font-bold ml-1" style="color:#fbbf24;">Register now →</a>
+                </span>
+            </div>
+
+            <!-- Top row: Profile + Attendance summary -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+                <!-- Profile card -->
+                <div class="bg-card rounded-2xl p-6 flex flex-col items-center justify-center gap-4 relative overflow-hidden">
+                    <div class="absolute inset-0 pointer-events-none" style="background:radial-gradient(ellipse at 70% 20%, rgba(82,183,136,0.06), transparent 60%);"></div>
+                    <div class="w-20 h-20 rounded-full overflow-hidden border-4 border-[#52b788]/30 bg-black/20 flex items-center justify-center relative z-10">
+                        <img id="student-photo" src="" alt="Profile" class="w-full h-full object-cover hidden">
+                        <i data-lucide="user" class="w-9 h-9 text-gray-500" id="student-photo-placeholder"></i>
+                    </div>
+                    <div class="text-center relative z-10">
+                        <p id="student-name" class="text-lg font-black uppercase">—</p>
+                        <p id="student-sn" class="text-xs text-gray-400 mt-1 font-mono">SN: —</p>
+                        <p id="student-course-year" class="text-xs text-emerald-custom mt-1 font-bold uppercase">—</p>
+                    </div>
+                    <a href="/student-portal" class="relative z-10 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#52b788]/70 hover:text-[#52b788] transition-colors">
+                        <i data-lucide="pencil" class="w-3 h-3"></i>
+                        Edit Profile
+                    </a>
+                </div>
+
+                <!-- Attendance summary -->
+                <div class="bg-card rounded-2xl p-6 flex flex-col gap-4">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-emerald-custom">My Attendance Summary</h3>
+                    <div class="grid grid-cols-2 gap-3 flex-1">
+                        <div class="bg-black/20 rounded-xl p-4 text-center">
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Present</p>
+                            <p id="my-present" class="text-3xl font-black">—</p>
+                        </div>
+                        <div class="bg-black/20 rounded-xl p-4 text-center">
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Absent</p>
+                            <p id="my-absent" class="text-3xl font-black text-red-400">—</p>
+                        </div>
+                        <div class="bg-black/20 rounded-xl p-4 text-center">
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Late</p>
+                            <p id="my-late" class="text-3xl font-black text-yellow-400">—</p>
+                        </div>
+                        <div class="bg-black/20 rounded-xl p-4 text-center">
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Rate</p>
+                            <p id="my-rate" class="text-3xl font-black text-emerald-custom">—</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Portal CTA banner -->
+            <a href="/student-portal" class="portal-cta rounded-2xl p-5 mb-6 flex items-center gap-5 cursor-pointer block no-underline">
+                <div class="w-12 h-12 rounded-xl bg-[#52b788]/15 border border-[#52b788]/25 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="user-circle-2" class="w-6 h-6 text-[#52b788]"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <span class="portal-pill">Student Portal</span>
+                    <p class="text-sm font-black uppercase tracking-wide leading-tight">Manage My Profile &amp; Face Data</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">Register, update your information, and upload face recognition training images</p>
+                </div>
+                <span class="portal-btn flex-shrink-0">
+                    <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    Open Portal
+                </span>
+            </a>
+
+            <!-- Student's own attendance log -->
+            <div class="bg-card rounded-2xl overflow-hidden">
+                <div class="p-5 border-b border-white/5 flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-widest opacity-80">My Attendance Records</h3>
+                    <a href="/student-portal#attendance" class="text-[10px] font-bold uppercase tracking-widest text-[#52b788]/60 hover:text-[#52b788] transition-colors flex items-center gap-1">
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                        View All
+                    </a>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-black/20 text-gray-400 font-bold uppercase">
+                            <tr>
+                                <th class="p-4">Date</th>
+                                <th class="p-4">Time In</th>
+                                <th class="p-4">Time Out</th>
+                                <th class="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-log-body">
+                            <tr><td colspan="4" class="p-10 text-center text-gray-500 italic">Loading your records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div><!-- /student-view -->
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             FACULTY / ADMIN VIEW
+        ═══════════════════════════════════════════════════════════════════ -->
+        <div id="staff-view" class="hidden">
+
+            <!-- Stats row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-card p-5 rounded-2xl text-center">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Enrolled</p>
+                    <h2 id="stat-total" class="text-3xl font-black">0</h2>
+                </div>
+                <div class="bg-card p-5 rounded-2xl text-center">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Attendance Rate</p>
+                    <h2 id="stat-rate" class="text-3xl font-black text-emerald-custom">0%</h2>
+                </div>
+                <div class="bg-card p-5 rounded-2xl text-center">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Present Today</p>
+                    <h2 id="stat-present" class="text-3xl font-black">0</h2>
+                </div>
+                <div class="bg-card p-5 rounded-2xl text-center">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Logs Today</p>
+                    <h2 id="stat-records" class="text-3xl font-black">0</h2>
+                </div>
+            </div>
+
+            <!-- Scanner activity feed + Donut chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+
+                <!-- Scanner activity -->
+                <div class="lg:col-span-8 bg-card rounded-2xl p-6">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-emerald-custom mb-6">Scanner Activity</h3>
+                    <div class="bg-black/20 border border-white/5 rounded-xl p-4 mb-6">
+                        <p class="text-[10px] font-bold text-gray-500 uppercase mb-3">Last Recognized (from Scanner)</p>
+                        <p id="last-name" class="text-sm font-black uppercase">Waiting...</p>
+                        <p id="last-sn" class="text-xs text-gray-400 mt-1">SN: -----</p>
+                        <p id="last-status" class="text-xs font-black text-emerald-custom mt-1 uppercase">System: Active</p>
+                    </div>
+                    <p class="text-[10px] font-bold text-gray-500 uppercase mb-3">Recent Activity</p>
+                    <div id="session-activity-list" class="space-y-2 max-h-36 overflow-y-auto custom-scroll pr-2">
+                        <p class="text-[10px] text-gray-500 italic">Connecting to scanner...</p>
+                    </div>
+                </div>
+
+                <!-- Donut chart -->
+                <div class="lg:col-span-4 bg-card rounded-2xl p-6 flex flex-col items-center justify-center">
+                    <h3 class="text-xs font-bold uppercase tracking-widest self-start mb-6">Session Attendance</h3>
+                    <div class="relative w-44 h-44">
+                        <canvas id="attendanceChart"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span id="chart-percent" class="text-2xl font-black">0%</span>
+                            <span class="text-[10px] uppercase text-gray-400 font-bold tracking-tighter">Present</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent logs table -->
+            <div class="bg-card rounded-2xl overflow-hidden">
+                <div class="p-5 border-b border-white/5">
+                    <h3 class="text-xs font-bold uppercase tracking-widest opacity-80">Recent Logs</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-black/20 text-gray-400 font-bold uppercase">
+                            <tr>
+                                <th class="p-4">SN (Student Number)</th>
+                                <th class="p-4">Name</th>
+                                <th class="p-4">Course</th>
+                                <th class="p-4">Year</th>
+                                <th class="p-4">Time In</th>
+                                <th class="p-4">Time Out</th>
+                                <th class="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-table-body">
+                            <tr><td colspan="7" class="p-10 text-center text-gray-500 italic">Syncing with Face Scanner...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div><!-- /staff-view -->
+
+    </main>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         SIDEBAR
+         Role visibility rules:
+           student-only       → Dashboard, My Profile
+           faculty-admin-only → Face Scanner, Student Records, Attendance Log,
+                                Schedule, Report & Analytics, Create Account
+           admin-only         → (subset of faculty-admin-only; used for admin-
+                                exclusive items if needed in future)
+    ════════════════════════════════════════════════════════════════════════ -->
+    <aside class="w-64 sidebar hidden lg:flex flex-col p-4 h-screen sticky top-0 border-l border-white/5">
+        <div class="flex flex-col gap-1 h-full">
+
+            <!-- Dashboard (all roles) -->
+            <a href="/dashboard" class="nav-item-active flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+            </a>
+
+            <!-- My Profile — students only -->
+            <a href="/student-portal" class="nav-item student-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="user-circle-2" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">My Profile</span>
+            </a>
+
+            <!-- Face Scanner — faculty + admin only (students do NOT operate the kiosk) -->
+            <a href="/scanner" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="scan" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Face Scanner</span>
+            </a>
+
+            <!-- Faculty + Admin only -->
+            <a href="/students" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Student Records</span>
+            </a>
+            <a href="/logs" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Attendance Log</span>
+            </a>
+            <a href="/schedule" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Schedule</span>
+            </a>
+            <a href="/reports" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Report &amp; Analytics</span>
+            </a>
+            <a href="/create-account" class="nav-item faculty-admin-only flex items-center gap-3 p-3 rounded-lg">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">Create Account</span>
+            </a>
+
+            <div class="mt-auto border-t border-white/5 pt-4 flex flex-col gap-1">
+                <a href="/settings" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-widest">Settings</span>
+                </a>
+                <a href="/logout" class="nav-item flex items-center gap-3 p-3 rounded-lg cursor-pointer text-red-400 hover:bg-red-400/10">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-widest">Logout</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        let attendanceChart = null;
+        let lastLoggedId    = null;
+        let currentDay      = new Date().toLocaleDateString();
+        let userRole        = null;
+
+        lucide.createIcons();
+
+        async function initDashboard() {
+            try {
+                const res     = await fetch('/api/session-info');
+                const session = await res.json();
+
+                if (!session.logged_in) { window.location.href = '/'; return; }
+
+                userRole = session.role;
+
+                const badge = document.getElementById('role-badge');
+                if (badge) badge.textContent = userRole;
+
+                // Reveal nav items by role
+                if (userRole === 'student') {
+                    document.querySelectorAll('.student-only').forEach(el => el.style.display = 'flex');
+                    document.querySelectorAll('.faculty-admin-only').forEach(el => el.style.display = 'none');
+                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                } else if (userRole === 'faculty') {
+                    document.querySelectorAll('.faculty-admin-only').forEach(el => el.style.display = 'flex');
+                    document.querySelectorAll('.student-only').forEach(el => el.style.display = 'none');
+                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                } else if (userRole === 'admin') {
+                    document.querySelectorAll('.faculty-admin-only').forEach(el => el.style.display = 'flex');
+                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
+                    document.querySelectorAll('.student-only').forEach(el => el.style.display = 'none');
+                }
+
+                if (userRole === 'student') {
+                    document.getElementById('student-view').classList.remove('hidden');
+                    loadStudentView();
+                } else {
+                    document.getElementById('staff-view').classList.remove('hidden');
+                    syncDashboard();
+                    setInterval(syncDashboard, 3000);
+                    checkAndMarkExpiredSchedules();
+                    setInterval(checkAndMarkExpiredSchedules, 120000); // check every 2 minutes
+                    initSocket();
+                }
+
+            } catch (err) {
+                console.error('Session check failed:', err);
+                window.location.href = '/';
+            }
+        }
+
+        async function loadStudentView() {
+            try {
+                const studRes  = await fetch('/api/get_students');
+                const students = await studRes.json();
+
+                if (students.length > 0) {
+                    const s = students[0];
+                    document.getElementById('student-name').textContent        = s.name || '—';
+                    document.getElementById('student-sn').textContent          = `SN: ${s.student_number || '—'}`;
+                    document.getElementById('student-course-year').textContent = `${s.course || '—'} — ${s.year || '—'}`;
+
+                    if (s.display_photo) {
+                        const img = document.getElementById('student-photo');
+                        img.src = s.display_photo;
+                        img.classList.remove('hidden');
+                        document.getElementById('student-photo-placeholder').style.display = 'none';
+                    }
+
+                    document.getElementById('not-registered-warn').classList.add('hidden');
+                } else {
+                    document.getElementById('not-registered-warn').classList.remove('hidden');
+                    document.getElementById('student-name').textContent        = 'Not Registered';
+                    document.getElementById('student-sn').textContent          = 'SN: —';
+                    document.getElementById('student-course-year').textContent = 'Complete setup in My Profile';
+                }
+
+                const logRes = await fetch('/api/attendance_logs');
+                const logs   = await logRes.json();
+
+                let present = 0, absent = 0, late = 0;
+                const tbody = document.getElementById('student-log-body');
+                tbody.innerHTML = '';
+
+                if (!Array.isArray(logs) || logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-10 text-center text-gray-500 italic">No attendance records yet.</td></tr>';
+                } else {
+                    logs.forEach(log => {
+                        const s = (log.status || '').toLowerCase();
+                        if      (s === 'present') present++;
+                        else if (s === 'absent')  absent++;
+                        else if (s === 'late')    late++;
+                    });
+
+                    logs.slice(0, 10).forEach(log => {
+                        const status      = (log.status || '').toLowerCase();
+                        const timeIn      = formatTime(log.time_in);
+                        const timeOut     = formatTime(log.time_out);
+                        const statusColor = status === 'present' ? 'text-emerald-custom'
+                                          : status === 'late'    ? 'text-yellow-400'
+                                          : status === 'absent'  ? 'text-red-400'
+                                          : 'text-gray-400';
+
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-white/5 hover:bg-white/5 transition-colors';
+                        row.innerHTML = `
+                            <td class="p-4 text-gray-300">${log.date || '—'}</td>
+                            <td class="p-4 text-gray-400">${timeIn}</td>
+                            <td class="p-4 text-gray-400">${timeOut}</td>
+                            <td class="p-4 font-black italic text-[10px] uppercase ${statusColor}">${log.status || '—'}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+
+                const total = present + absent + late;
+                const rate  = total > 0 ? Math.round((present / total) * 100) : 0;
+
+                document.getElementById('my-present').textContent = present;
+                document.getElementById('my-absent').textContent  = absent;
+                document.getElementById('my-late').textContent    = late;
+                document.getElementById('my-rate').textContent    = `${rate}%`;
+
+            } catch (err) {
+                console.error('Student view error:', err);
+            }
+        }
+
+        function formatTime(raw) {
+            if (!raw || raw === '--:--') return '--:--';
+            const parts = raw.split(':');
+            if (parts.length < 2) return raw;
+            let hours  = parseInt(parts[0], 10);
+            const mins = parts[1];
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours      = hours % 12 || 12;
+            return `${hours}:${mins} ${ampm}`;
+        }
+
+        async function syncDashboard() {
+            try {
+                const today = new Date().toLocaleDateString();
+                if (today !== currentDay) { currentDay = today; resetDailyStats(); }
+
+                const response = await fetch('/api/dashboard_stats');
+                if (response.status === 403) return;
+                const data = await response.json();
+
+                if (!data.error) {
+                    updateDashboardUI(data);
+                    if (data.recent_logs && data.recent_logs.length > 0) {
+                        const mostRecent = data.recent_logs[0];
+                        if (mostRecent.student_number !== lastLoggedId) {
+                            updateRecognitionCard(mostRecent);
+                            lastLoggedId = mostRecent.student_number;
+                        }
+                        refreshTable(data.recent_logs);
+                    }
+                }
+            } catch (error) {
+                console.error("Sync error:", error);
+            }
+        }
+
+        function resetDailyStats() {
+            document.getElementById('stat-present').innerText  = "0";
+            document.getElementById('stat-records').innerText  = "0";
+            document.getElementById('stat-rate').innerText     = "0%";
+            document.getElementById('chart-percent').innerText = "0%";
+            document.getElementById('last-name').innerText     = "Waiting...";
+            document.getElementById('last-sn').innerText       = "SN: -----";
+            document.getElementById('last-status').innerText   = "STATUS: ACTIVE";
+            document.getElementById('session-activity-list').innerHTML =
+                `<p class="text-[10px] text-gray-500 italic">Connecting to scanner...</p>`;
+            document.getElementById('records-table-body').innerHTML =
+                `<tr><td colspan="7" class="p-10 text-center text-gray-500 italic">Syncing with Face Scanner...</td></tr>`;
+            lastLoggedId = null;
+            if (attendanceChart) { attendanceChart.destroy(); attendanceChart = null; }
+        }
+
+        function updateRecognitionCard(log) {
+            document.getElementById('last-name').innerText   = log.name || "Unknown";
+            document.getElementById('last-sn').innerText     = `SN: ${log.student_number || 'N/A'}`;
+            document.getElementById('last-status').innerText = `STATUS: ${log.status || 'RECOGNIZED'}`;
+
+            const activityList = document.getElementById('session-activity-list');
+            if (activityList && (activityList.innerHTML.includes("Connecting") || activityList.innerHTML.includes("italic"))) {
+                activityList.innerHTML = "";
+            }
+
+            const logTime = formatTime(log.time_in || log.time || log.timestamp || '--:--');
+            const entry   = document.createElement('p');
+            entry.className = "text-[10px] border-l border-emerald-custom pl-2 py-1 bg-white/5 new-row-flash";
+            entry.innerHTML = `<span class="text-emerald-custom font-bold">[${log.student_number || 'N/A'}]</span> ${log.name} verified at ${logTime}`;
+
+            if (activityList) {
+                activityList.prepend(entry);
+                if (activityList.children.length > 5) activityList.removeChild(activityList.lastChild);
+            }
+        }
+
+        function refreshTable(logs) {
+            const logTableBody = document.querySelector("#records-table-body");
+            if (!logTableBody) return;
+            logTableBody.innerHTML = "";
+
+            logs.forEach(log => {
+                const timeIn  = formatTime(log.time_in  || log.timestamp || log.time);
+                const timeOut = formatTime(log.time_out);
+
+                const row = document.createElement("tr");
+                row.className = "border-b border-white/5 hover:bg-white/5 transition-colors";
+                row.innerHTML = `
+                    <td class="p-4 text-gray-400 font-mono">${log.student_number}</td>
+                    <td class="p-4 font-bold uppercase">${log.name}</td>
+                    <td class="p-4 text-gray-300 uppercase">${log.course || 'N/A'}</td>
+                    <td class="p-4 text-gray-300 uppercase">${log.year || 'N/A'}</td>
+                    <td class="p-4 text-gray-400">${timeIn}</td>
+                    <td class="p-4 text-gray-400">${timeOut}</td>
+                    <td class="p-4 text-emerald-custom font-black italic text-[10px] uppercase">
+                        <span>${log.status || 'ON-TIME'}</span>
+                    </td>
+                `;
+                logTableBody.appendChild(row);
+            });
+        }
+
+        function updateDashboardUI(data) {
+            document.getElementById('stat-total').innerText    = data.total_enrolled      || 0;
+            document.getElementById('stat-rate').innerText     = `${data.attendance_rate  || 0}%`;
+            document.getElementById('stat-present').innerText  = data.present_today       || 0;
+            document.getElementById('stat-records').innerText  = data.total_records_today || 0;
+            document.getElementById('chart-percent').innerText = `${data.attendance_rate  || 0}%`;
+            updateChart(data.present_today, data.total_enrolled);
+        }
+
+        function updateChart(present, total) {
+            const absent = Math.max(0, total - present);
+            const ctx    = document.getElementById('attendanceChart').getContext('2d');
+            if (attendanceChart) {
+                attendanceChart.data.datasets[0].data = [present, absent];
+                attendanceChart.update();
+            } else {
+                attendanceChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [present, absent],
+                            backgroundColor: ['#52b788', 'rgba(255,255,255,0.05)'],
+                            borderWidth: 0,
+                            cutout: '80%'
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+
+        function initSocket() {
+            const socket = io();
+            socket.on('attendance_update', function (data) {
+                updateRecognitionCard(data);
+
+                const logTableBody = document.querySelector("#records-table-body");
+                if (logTableBody) {
+                    const newRow = document.createElement("tr");
+                    newRow.className = "border-b border-white/5 hover:bg-white/5 transition-colors new-row-flash";
+
+                    const timeIn  = formatTime(data.time_in  || data.timestamp || data.time);
+                    const timeOut = formatTime(data.time_out);
+
+                    let course = 'N/A', year = 'N/A';
+                    if (data.course_year) {
+                        const parts = data.course_year.split(' ');
+                        course = parts[0] || 'N/A';
+                        year   = parts.slice(1).join(' ') || 'N/A';
+                    } else if (data.course) {
+                        course = data.course;
+                        year   = data.year || 'N/A';
+                    }
+
+                    newRow.innerHTML = `
+                        <td class="p-4 text-gray-400 font-mono">${data.student_number}</td>
+                        <td class="p-4 font-bold uppercase">${data.name}</td>
+                        <td class="p-4 text-gray-300 uppercase">${course}</td>
+                        <td class="p-4 text-gray-300 uppercase">${year}</td>
+                        <td class="p-4 text-gray-400">${timeIn}</td>
+                        <td class="p-4 text-gray-400">${timeOut}</td>
+                        <td class="p-4 text-emerald-custom font-black italic text-[10px] uppercase">
+                            <span>${data.status || 'PRESENT'}</span>
+                        </td>
+                    `;
+                    logTableBody.insertBefore(newRow, logTableBody.firstChild);
+                    if (logTableBody.children.length > 10) logTableBody.removeChild(logTableBody.lastChild);
+                }
+
+                fetch('/api/dashboard_stats')
+                    .then(r => r.json())
+                    .then(stats => {
+                        document.getElementById("stat-present").innerText  = stats.present_today;
+                        document.getElementById("stat-records").innerText  = stats.total_records_today;
+                        document.getElementById("stat-rate").innerText     = stats.attendance_rate + '%';
+                        document.getElementById("chart-percent").innerText = stats.attendance_rate + '%';
+                    })
+                    .catch(err => console.error(err));
+            });
+        }
+
+        // ── CHECK AND MARK EXPIRED SCHEDULES ──────────────────────────────────────
+        async function checkAndMarkExpiredSchedules() {
+            try {
+                const res = await fetch('/api/check-expired-schedules', { method: 'POST' });
+                const data = await res.json();
+                if (data.success && Object.keys(data.details).length > 0) {
+                    console.log('Expired schedules checked and absents marked:', data.details);
+                }
+            } catch (e) {
+                console.warn('Error checking expired schedules:', e);
+            }
+        }
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>

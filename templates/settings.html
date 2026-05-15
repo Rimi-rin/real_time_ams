@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-dark: #124e3f;
+            --primary-medium: #1b6b55;
+            --primary-light: #2c9376;
+            --bg-color: #1b4332;
+            --text-color: #ffffff;
+            --text-muted: #a0c2b7;
+            --input-bg: #e2f0e8;
+            --input-text: #111111;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .settings-container {
+            background-color: var(--primary-medium);
+            width: 100%;
+            max-width: 600px;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .avatar-container {
+            width: 90px;
+            height: 90px;
+            background-color: var(--primary-dark);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .avatar-container i {
+            font-size: 42px;
+            color: var(--text-color);
+        }
+
+        .header h2 {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-color);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 18px;
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        /* Read-only username styling */
+        .form-group input[readonly] {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background-color: #c8ddd4;
+        }
+
+        .role-section {
+            margin-top: 25px;
+            margin-bottom: 30px;
+        }
+
+        .role-section span {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .role-tags {
+            display: flex;
+            gap: 12px;
+        }
+
+        .role-tag {
+            background-color: var(--primary-dark);
+            color: var(--text-color);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            opacity: 0.45;
+            /* Not clickable — role is set by the server */
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .role-tag.active {
+            background-color: var(--primary-light);
+            border-color: var(--text-color);
+            opacity: 1;
+        }
+
+        .role-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            font-style: italic;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 35px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background-color: var(--primary-light);
+            color: var(--text-color);
+        }
+
+        .btn-save:hover {
+            background-color: #38b08d;
+            transform: translateY(-1px);
+        }
+
+        .btn-save:disabled {
+            background-color: #3d7a65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-back {
+            background-color: transparent;
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-back:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-color);
+        }
+
+        #status-msg {
+            display: none;
+            text-align: center;
+            margin-top: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #status-msg.success { background-color: rgba(82,183,136,0.2); color: #52b788; }
+        #status-msg.error   { background-color: rgba(255,80,80,0.2);  color: #ff6b6b; }
+    </style>
+</head>
+<body>
+
+    <div class="settings-container">
+        <div class="header">
+            <div class="avatar-container">
+                <i class="fa-solid fa-user-gear" id="avatar-icon"></i>
+            </div>
+            <h2>Account Settings</h2>
+            <p>Update your password</p>
+        </div>
+
+        <div class="form-group">
+            <label for="username"><i class="fa-solid fa-user"></i> Username</label>
+            <!-- Populated from session — read-only so users can't change their own username -->
+            <input type="text" id="username" name="username" readonly placeholder="Loading...">
+        </div>
+
+        <div class="form-group">
+            <label for="current-password"><i class="fa-solid fa-lock"></i> Current Password</label>
+            <input type="password" id="current-password" placeholder="Enter current password">
+        </div>
+
+        <div class="form-group">
+            <label for="new-password"><i class="fa-solid fa-key"></i> New Password</label>
+            <input type="password" id="new-password" placeholder="Enter new password">
+        </div>
+
+        <div class="form-group">
+            <label for="confirm-password"><i class="fa-solid fa-check-double"></i> Confirm New Password</label>
+            <input type="password" id="confirm-password" placeholder="Repeat new password">
+        </div>
+
+        <!-- Role display — read-only, set by server -->
+        <div class="role-section">
+            <span><i class="fa-solid fa-tags"></i> Your Role</span>
+            <div class="role-tags" id="role-tags-container">
+                <div class="role-tag" id="role-student"><i class="fa-solid fa-graduation-cap"></i> Student</div>
+                <div class="role-tag" id="role-faculty"><i class="fa-solid fa-chalkboard-user"></i> Faculty</div>
+                <div class="role-tag" id="role-admin"><i class="fa-solid fa-shield-halved"></i> Admin</div>
+            </div>
+            <p class="role-note"><i class="fa-solid fa-circle-info"></i> Role is assigned by an administrator and cannot be changed here.</p>
+        </div>
+
+        <div id="status-msg"></div>
+
+        <div class="action-buttons">
+            <button type="button" class="btn btn-back" onclick="window.history.back();">
+                <i class="fa-solid fa-arrow-left"></i> Go Back
+            </button>
+            <button type="button" class="btn btn-save" id="save-btn" onclick="saveSettings()">
+                <i class="fa-solid fa-floppy-disk"></i> Save Changes
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ── On load: pull session info and reflect it in the UI ──────────────
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/api/session-info');
+                const session = await res.json();
+
+                if (!session.logged_in) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Show username (read-only)
+                document.getElementById('username').value = session.username || '';
+
+                // Highlight the correct role tag (no click handler — display only)
+                const roleMap = {
+                    student: 'role-student',
+                    faculty: 'role-faculty',
+                    admin:   'role-admin'
+                };
+                const activeId = roleMap[session.role];
+                if (activeId) {
+                    document.getElementById(activeId).classList.add('active');
+                }
+
+                // Swap avatar icon per role
+                const iconMap = {
+                    student: 'fa-graduation-cap',
+                    faculty: 'fa-chalkboard-user',
+                    admin:   'fa-shield-halved'
+                };
+                const avatarIcon = document.getElementById('avatar-icon');
+                if (iconMap[session.role]) {
+                    avatarIcon.className = `fa-solid ${iconMap[session.role]}`;
+                }
+
+            } catch (err) {
+                console.error('Session load error:', err);
+            }
+        });
+
+        // ── Save: only password change is allowed ────────────────────────────
+        async function saveSettings() {
+            const currentPw  = document.getElementById('current-password').value.trim();
+            const newPw      = document.getElementById('new-password').value.trim();
+            const confirmPw  = document.getElementById('confirm-password').value.trim();
+            const statusMsg  = document.getElementById('status-msg');
+            const saveBtn    = document.getElementById('save-btn');
+
+            statusMsg.style.display = 'none';
+
+            if (!currentPw || !newPw || !confirmPw) {
+                showStatus('Please fill in all password fields.', 'error');
+                return;
+            }
+
+            if (newPw !== confirmPw) {
+                showStatus('New passwords do not match.', 'error');
+                return;
+            }
+
+            if (newPw.length < 6) {
+                showStatus('New password must be at least 6 characters.', 'error');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_password: currentPw,
+                        new_password: newPw
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showStatus('Password updated successfully!', 'success');
+                    document.getElementById('current-password').value = '';
+                    document.getElementById('new-password').value     = '';
+                    document.getElementById('confirm-password').value = '';
+                } else {
+                    showStatus(data.message || 'Failed to update password.', 'error');
+                }
+            } catch (err) {
+                showStatus('Server error. Please try again.', 'error');
+                console.error(err);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+            }
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status-msg');
+            el.textContent = msg;
+            el.className   = type;
+            el.style.display = 'block';
+        }
+    </script>
+
+</body>
+</html>

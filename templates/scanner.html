@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Kiosk — Face Scanner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <style>
+        :root {
+            --bg:           #081c18;
+            --surface:      #0f2b23;
+            --surface2:     rgba(18,46,36,0.8);
+            --border:       rgba(82,183,136,0.15);
+            --emerald:      #52b788;
+            --emerald-dim:  rgba(82,183,136,0.12);
+            --yellow:       #f1c40f;
+            --red:          #e74c3c;
+            --text:         #d9f0d9;
+            --text-muted:   rgba(217,240,217,0.45);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── TOP BAR ── */
+        .top-bar {
+            background: linear-gradient(135deg, #071814 0%, #0d2b22 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .top-bar-left { display: flex; align-items: center; gap: 14px; }
+
+        .kiosk-badge {
+            background: var(--emerald-dim);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--emerald);
+        }
+
+        .top-bar h2 {
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .top-bar-right { display: flex; align-items: center; gap: 12px; }
+
+        .operator-badge {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 20px;
+            padding: 5px 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .operator-badge i { color: var(--emerald); font-size: 10px; }
+
+        .clock {
+            font-size: 13px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--emerald);
+            background: var(--emerald-dim);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 5px 14px;
+            letter-spacing: 0.05em;
+        }
+
+        .home-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex; align-items: center; gap: 7px;
+            transition: 0.2s;
+        }
+        .home-btn:hover { background: var(--emerald-dim); border-color: var(--border); }
+
+        /* ── MAIN LAYOUT ── */
+        .layout {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        /* ── LEFT: CAMERA PANEL ── */
+        .camera-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 28px 32px;
+            border-right: 1px solid var(--border);
+            background: radial-gradient(ellipse at center, rgba(18,46,36,0.6) 0%, transparent 70%);
+        }
+
+        .camera-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* Camera frame — square kiosk style */
+        .cam-frame {
+            width: 340px;
+            height: 340px;
+            border-radius: 20px;
+            border: 3px solid rgba(82,183,136,0.2);
+            background: #000;
+            overflow: hidden;
+            position: relative;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .cam-frame.scanning {
+            border-color: var(--emerald);
+            box-shadow: 0 0 40px rgba(82,183,136,0.25), inset 0 0 60px rgba(82,183,136,0.05);
+        }
+
+        .cam-frame.no-schedule {
+            border-color: var(--yellow);
+            box-shadow: 0 0 40px rgba(241,196,15,0.2);
+        }
+
+        video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        /* Corner guides */
+        .cam-frame::before, .cam-frame::after {
+            content: '';
+            position: absolute;
+            width: 28px; height: 28px;
+            border-color: var(--emerald);
+            border-style: solid;
+            opacity: 0.6;
+            z-index: 5;
+        }
+        .cam-frame::before { top: 10px; left: 10px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+        .cam-frame::after  { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+        .scan-line {
+            position: absolute;
+            left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(to right, transparent, var(--emerald), transparent);
+            display: none;
+            z-index: 10;
+            animation: scanMove 2s infinite ease-in-out;
+            box-shadow: 0 0 12px var(--emerald);
+        }
+        @keyframes scanMove { 0% { top: 8%; } 50% { top: 90%; } 100% { top: 8%; } }
+
+        /* Status overlay inside camera */
+        .cam-status-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+            padding: 12px 16px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-align: center;
+            z-index: 8;
+            display: none;
+        }
+
+        /* Face box overlay */
+        .face-box {
+            position: absolute;
+            border: 2px solid var(--emerald);
+            border-radius: 4px;
+            display: none;
+            z-index: 6;
+            animation: facePulse 1.5s infinite;
+        }
+        @keyframes facePulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+        /* Scan button */
+        .btn-scan {
+            padding: 14px 52px;
+            border-radius: 50px;
+            border: none;
+            background: var(--emerald);
+            color: #071814;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.25s;
+            box-shadow: 0 6px 20px rgba(82,183,136,0.25);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .btn-scan:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(82,183,136,0.35);
+        }
+        .btn-scan:disabled {
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.3);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .auto-scan-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Toggle switch */
+        .toggle-switch { position: relative; width: 38px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px; transition: 0.3s;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute;
+            height: 14px; width: 14px; left: 2px; bottom: 2px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%; transition: 0.3s;
+        }
+        input:checked + .toggle-slider { background: var(--emerald); border-color: var(--emerald); }
+        input:checked + .toggle-slider::before { transform: translateX(18px); background: #071814; }
+
+        /* ── RIGHT: INFO PANEL ── */
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .info-panel-header {
+            padding: 18px 22px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Result card */
+        .result-card {
+            margin: 16px;
+            border-radius: 16px;
+            padding: 18px 20px;
+            display: none;
+            align-items: center;
+            gap: 16px;
+            animation: slideIn 0.35s cubic-bezier(0.34,1.2,0.64,1);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .result-card.recognized  { background: rgba(82,183,136,0.08); border-color: rgba(82,183,136,0.2); }
+        .result-card.unknown     { background: rgba(231,76,60,0.08);  border-color: rgba(231,76,60,0.2); }
+        .result-card.no-schedule { background: rgba(241,196,15,0.08); border-color: rgba(241,196,15,0.2); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .result-photo {
+            width: 76px; height: 76px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .result-info { flex: 1; min-width: 0; }
+        .result-name {
+            font-size: 17px; font-weight: 800;
+            margin-bottom: 4px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .result-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+        .result-message {
+            font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; gap: 5px;
+        }
+
+        .pill {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 20px;
+            font-size: 10px; font-weight: 800;
+            letter-spacing: 0.05em; text-transform: uppercase;
+        }
+        .pill-present  { background: rgba(82,183,136,0.2); color: #52b788; border: 1px solid rgba(82,183,136,0.3); }
+        .pill-late     { background: rgba(241,196,15,0.15); color: #f1c40f; border: 1px solid rgba(241,196,15,0.25); }
+        .pill-schedule { background: rgba(241,196,15,0.12); color: #f1c40f; border: 1px solid rgba(241,196,15,0.2); }
+        .pill-unknown  { background: rgba(231,76,60,0.15);  color: #e74c3c; border: 1px solid rgba(231,76,60,0.25); }
+        .pill-timeout  { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+
+        /* Idle message */
+        .idle-msg {
+            margin: 16px;
+            border-radius: 16px;
+            padding: 30px 20px;
+            text-align: center;
+            background: var(--emerald-dim);
+            border: 1px dashed var(--border);
+            color: var(--text-muted);
+        }
+        .idle-msg i { font-size: 28px; color: rgba(82,183,136,0.3); margin-bottom: 10px; display: block; }
+        .idle-msg p { font-size: 12px; margin: 0; }
+
+        /* Countdown bar */
+        .countdown-bar {
+            height: 3px;
+            background: var(--emerald-dim);
+            border-radius: 0 0 2px 2px;
+            overflow: hidden;
+            display: none;
+            margin: 0 16px;
+        }
+        .countdown-fill {
+            height: 100%;
+            background: var(--emerald);
+            width: 100%;
+            transition: width 0s linear;
+        }
+
+        /* History list */
+        .history-section {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid var(--border);
+        }
+
+        .history-header {
+            padding: 12px 22px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .history-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+        .history-scroll::-webkit-scrollbar { width: 3px; }
+        .history-scroll::-webkit-scrollbar-track { background: transparent; }
+        .history-scroll::-webkit-scrollbar-thumb { background: rgba(82,183,136,0.2); border-radius: 3px; }
+
+        .log-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 22px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.15s;
+            animation: rowIn 0.3s ease;
+        }
+        .log-row:hover { background: rgba(255,255,255,0.03); }
+        @keyframes rowIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }
+
+        .log-dot {
+            width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+        }
+        .dot-present { background: var(--emerald); }
+        .dot-late    { background: var(--yellow); }
+        .dot-absent  { background: var(--red); }
+        .dot-unknown { background: rgba(255,255,255,0.2); }
+
+        .log-name { font-size: 12px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-sn   { font-size: 10px; color: var(--text-muted); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+        .log-badge { flex-shrink: 0; }
+
+        /* No-schedule banner */
+        .no-sched-banner {
+            display: none;
+            margin: 0 16px 0;
+            padding: 12px 16px;
+            background: rgba(241,196,15,0.08);
+            border: 1px solid rgba(241,196,15,0.25);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #f1c40f;
+            gap: 8px;
+            align-items: center;
+        }
+        .no-sched-banner i { font-size: 14px; flex-shrink: 0; }
+
+        /* Mark absent button */
+        .mark-absent-btn {
+            margin: 12px 16px 0;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(231,76,60,0.3);
+            background: rgba(231,76,60,0.08);
+            color: #e74c3c;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: none;
+            width: calc(100% - 32px);
+            transition: 0.2s;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+        }
+        .mark-absent-btn:hover { background: rgba(231,76,60,0.15); }
+
+        /* Schedule info */
+        .schedule-info-bar {
+            margin: 0 16px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: var(--emerald-dim);
+            border: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--emerald);
+            display: none;
+            gap: 8px;
+            align-items: center;
+        }
+        .schedule-info-bar i { flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div class="top-bar">
+    <div class="top-bar-left">
+        <span class="kiosk-badge"><i class="fas fa-desktop" style="margin-right:5px;"></i>Kiosk Mode</span>
+        <h2><i class="fas fa-camera" style="margin-right:8px;color:#52b788;"></i>Attendance Scanner</h2>
+    </div>
+    <div class="top-bar-right">
+        <div class="operator-badge" id="operatorBadge">
+            <i class="fas fa-user-shield"></i>
+            <span id="operatorName">Loading...</span>
+        </div>
+        <div class="clock" id="liveClock">00:00:00</div>
+        <a href="/dashboard" class="home-btn">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="layout">
+
+    <!-- LEFT: Camera -->
+    <div class="camera-panel">
+        <div class="camera-label"><i class="fas fa-circle" style="color:#52b788;font-size:8px;margin-right:6px;animation:fadePulse 1.5s infinite;"></i>Live Camera Feed</div>
+
+        <div class="cam-frame" id="camFrame">
+            <video id="webcam" autoplay muted playsinline></video>
+            <div class="scan-line" id="scanLine"></div>
+            <div class="cam-status-overlay" id="camStatusOverlay"></div>
+            <div class="face-box" id="faceBox"></div>
+        </div>
+
+        <button class="btn-scan" id="scanBtn">
+            <i class="fas fa-camera"></i>
+            <span id="scanBtnText">SCAN FACE</span>
+        </button>
+
+        <div class="auto-scan-row">
+            <label class="toggle-switch">
+                <input type="checkbox" id="autoScanToggle">
+                <span class="toggle-slider"></span>
+            </label>
+            <span>Auto-scan every <strong id="autoIntervalLabel">3s</strong></span>
+            <select id="intervalSelect" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#d9f0d9;border-radius:6px;padding:3px 8px;font-size:11px;outline:none;">
+                <option value="2000">2s</option>
+                <option value="3000" selected>3s</option>
+                <option value="5000">5s</option>
+                <option value="8000">8s</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- RIGHT: Info panel -->
+    <div class="info-panel">
+        <div class="info-panel-header">
+            <span>Recognition Data</span>
+            <span id="scanCountBadge" style="background:rgba(82,183,136,0.1);border:1px solid rgba(82,183,136,0.2);border-radius:20px;padding:2px 10px;color:#52b788;">0 scans today</span>
+        </div>
+
+        <!-- Active schedule info -->
+        <div class="schedule-info-bar" id="scheduleInfoBar">
+            <i class="fas fa-calendar-check"></i>
+            <span id="scheduleInfoText">—</span>
+        </div>
+
+        <!-- No-schedule warning -->
+        <div class="no-sched-banner" id="noSchedBanner">
+            <i class="fas fa-calendar-xmark"></i>
+            <span>No active class schedule right now. Scans will not be recorded.</span>
+        </div>
+
+        <!-- Idle state -->
+        <div class="idle-msg" id="idleMsg">
+            <i class="fas fa-scan-face"></i>
+            <p>Position face in camera<br>and press <strong>Scan Face</strong></p>
+        </div>
+
+        <!-- Result card -->
+        <div class="result-card" id="resultCard">
+            <img class="result-photo" id="resPhoto" src="" alt="Photo">
+            <div class="result-info">
+                <div class="result-name" id="resName">—</div>
+                <div class="result-meta" id="resMeta">—</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span class="pill" id="resPill">—</span>
+                    <span class="result-message" id="resMsg">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Countdown bar (auto-dismiss) -->
+        <div class="countdown-bar" id="countdownBar">
+            <div class="countdown-fill" id="countdownFill"></div>
+        </div>
+
+        <!-- Mark Absent button (faculty/admin) -->
+        <button class="mark-absent-btn" id="markAbsentBtn" onclick="promptMarkAbsent()">
+            <i class="fas fa-user-xmark"></i> Mark Absent — End of Session
+        </button>
+
+        <!-- History -->
+        <div class="history-section">
+            <div class="history-header">
+                <span>Recent Scans</span>
+                <span id="historyCount" style="color:rgba(82,183,136,0.6);font-weight:600;">—</span>
+            </div>
+            <div class="history-scroll" id="historyScroll"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes fadePulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+</style>
+
+<script>
+// ── AUTH CHECK: faculty/admin only ─────────────────────────────────────────
+(async function guardRoute() {
+    try {
+        const res  = await fetch('/api/session-info');
+        const data = await res.json();
+        if (!data.logged_in || data.role === 'student') {
+            window.location.href = '/dashboard';
+            return;
+        }
+        document.getElementById('operatorName').textContent =
+            `${data.username} (${data.role})`;
+
+        // Show mark-absent only for faculty/admin
+        if (data.role === 'faculty' || data.role === 'admin') {
+            document.getElementById('markAbsentBtn').style.display = 'flex';
+        }
+    } catch (e) {
+        window.location.href = '/';
+    }
+})();
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────
+function updateClock() {
+    const now = new Date();
+    document.getElementById('liveClock').textContent =
+        now.toLocaleTimeString('en-US', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+const video        = document.getElementById('webcam');
+const camFrame     = document.getElementById('camFrame');
+const scanLine     = document.getElementById('scanLine');
+const scanBtn      = document.getElementById('scanBtn');
+const scanBtnText  = document.getElementById('scanBtnText');
+const idleMsg      = document.getElementById('idleMsg');
+const resultCard   = document.getElementById('resultCard');
+const countdownBar = document.getElementById('countdownBar');
+
+let isScanning     = false;
+let autoTimer      = null;
+let scanCount      = 0;
+let dismissTimer   = null;
+let countdownAnim  = null;
+let currentSchedId = null;
+
+// ── CAMERA ────────────────────────────────────────────────────────────────
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+        });
+        video.srcObject = stream;
+    } catch (e) {
+        idleMsg.innerHTML = '<i class="fas fa-video-slash" style="color:#e74c3c;"></i><p style="color:#e74c3c;">Camera access denied.<br>Please allow camera permission.</p>';
+        scanBtn.disabled = true;
+    }
+}
+
+// ── SCHEDULE CHECK ────────────────────────────────────────────────────────
+async function checkActiveSchedule() {
+    try {
+        const res   = await fetch('/api/schedules');
+        const scheds = await res.json();
+        const now   = new Date();
+        const todayDate = now.toISOString().split('T')[0];
+        const dayName   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+        const curMins   = now.getHours() * 60 + now.getMinutes();
+
+        let active = null;
+        for (const s of scheds) {
+            if (!s.start_time || !s.end_time) continue;
+            const [sh, sm] = s.start_time.split(':').map(Number);
+            const [eh, em] = s.end_time.split(':').map(Number);
+            const startM = sh * 60 + sm;
+            const endM   = eh * 60 + em;
+            const winStart = startM - 60;
+            if (curMins < winStart || curMins > endM) continue;
+
+            const days = s.recurring_days || [];
+            if ((s.date && s.date === todayDate) || days.includes(dayName)) {
+                active = s; break;
+            }
+        }
+
+        const infoBar   = document.getElementById('scheduleInfoBar');
+        const noBanner  = document.getElementById('noSchedBanner');
+
+        if (active) {
+            currentSchedId = active.id;
+            infoBar.style.display  = 'flex';
+            noBanner.style.display = 'none';
+            camFrame.classList.remove('no-schedule');
+            document.getElementById('scheduleInfoText').textContent =
+                `${active.name} — ${active.start_time} to ${active.end_time} | ${active.target_course} ${active.target_year}`;
+        } else {
+            currentSchedId = null;
+            infoBar.style.display  = 'none';
+            noBanner.style.display = 'flex';
+            camFrame.classList.add('no-schedule');
+        }
+    } catch (e) { console.warn('Schedule check error:', e); }
+}
+
+// ── SCAN ──────────────────────────────────────────────────────────────────
+async function captureAndScan() {
+    if (isScanning) return;
+    isScanning = true;
+
+    scanLine.style.display = 'block';
+    camFrame.classList.add('scanning');
+    scanBtnText.textContent = 'SCANNING...';
+    scanBtn.disabled = true;
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+        const fd = new FormData();
+        fd.append('image', blob, 'scan.jpg');
+
+        try {
+            const res    = await fetch('/scan', { method: 'POST', body: fd });
+            const result = await res.json();
+            handleScanResult(result);
+        } catch (err) {
+            console.error('Scan error:', err);
+            showResult({
+                status: 'error',
+                message: 'Connection error. Please check server.'
+            });
+        } finally {
+            scanLine.style.display = 'none';
+            camFrame.classList.remove('scanning');
+            scanBtnText.textContent = 'SCAN FACE';
+            scanBtn.disabled = false;
+            isScanning = false;
+        }
+    }, 'image/jpeg', 0.9);
+}
+
+function handleScanResult(result) {
+    if (result.status === 'recognized') {
+        const status   = result.attendance_status || 'Present';
+        const scanType = result.scan_type || 'time_in';
+        const message  = result.message  || 'Recorded';
+
+        let pillClass = 'pill-present';
+        let pillLabel = status;
+        if (status === 'Late') pillClass = 'pill-late';
+        if (scanType === 'time_out') { pillClass = 'pill-timeout'; pillLabel = 'Time Out'; }
+
+        showResult({
+            status:    'recognized',
+            name:      result.name,
+            meta:      `SN: ${result.student_number} · ${result.course || 'N/A'} ${result.year || ''}`,
+            photo:     result.image,
+            pillClass, pillLabel,
+            message,
+        });
+
+        addToHistory({
+            name:   result.name,
+            sn:     result.student_number,
+            time:   new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+            status: status,
+            type:   scanType,
+        });
+
+        scanCount++;
+        document.getElementById('scanCountBadge').textContent = `${scanCount} scans today`;
+
+        // SweetAlert
+        const icon = status === 'Late' ? 'warning' : 'success';
+        Swal.fire({
+            icon, title: scanType === 'time_out' ? 'Time Out' : result.name,
+            text: message,
+            timer: 2500, showConfirmButton: false,
+            background: '#0f2b23', color: '#d9f0d9',
+        });
+
+    } else if (result.status === 'no_schedule') {
+        showResult({
+            status:    'no-schedule',
+            name:      result.name || 'Face Recognized',
+            meta:      result.student_number ? `SN: ${result.student_number}` : '',
+            photo:     result.image,
+            pillClass: 'pill-schedule',
+            pillLabel: 'No Schedule',
+            message:   'No active class at this time — not recorded.',
+        });
+        Swal.fire({
+            icon: 'info', title: 'No Active Schedule',
+            text: 'Face recognized but no class is scheduled right now.',
+            timer: 2800, showConfirmButton: false,
+            background: '#0f2b23', color: '#d9f0d9',
+        });
+
+    } else if (result.status === 'unknown') {
+        showResult({
+            status:    'unknown',
+            name:      'Face Not Recognized',
+            meta:      result.message || '',
+            pillClass: 'pill-unknown',
+            pillLabel: 'Unknown',
+            message:   '',
+        });
+
+    } else {
+        // Generic error / no face
+        showResult({
+            status:  'unknown',
+            name:    result.message || 'No face detected',
+            meta:    '',
+            pillClass: 'pill-unknown',
+            pillLabel: 'Error',
+            message: '',
+        });
+    }
+}
+
+function showResult({ status, name, meta, photo, pillClass, pillLabel, message }) {
+    // Clear timers
+    clearTimeout(dismissTimer);
+    clearInterval(countdownAnim);
+
+    idleMsg.style.display     = 'none';
+    resultCard.style.display  = 'flex';
+    countdownBar.style.display = 'block';
+
+    resultCard.className = `result-card ${status}`;
+
+    document.getElementById('resName').textContent  = name   || '—';
+    document.getElementById('resMeta').textContent  = meta   || '';
+    document.getElementById('resMsg').textContent   = message || '';
+
+    const pill = document.getElementById('resPill');
+    pill.className   = `pill ${pillClass || ''}`;
+    pill.textContent = pillLabel || '';
+
+    const photoEl = document.getElementById('resPhoto');
+    photoEl.src = photo || '';
+    photoEl.onerror = () => { photoEl.src = ''; };
+
+    // Countdown dismiss (8 seconds)
+    const DISMISS_MS = 8000;
+    const fill = document.getElementById('countdownFill');
+    fill.style.transition = 'none';
+    fill.style.width = '100%';
+    setTimeout(() => {
+        fill.style.transition = `width ${DISMISS_MS}ms linear`;
+        fill.style.width = '0%';
+    }, 30);
+
+    dismissTimer = setTimeout(() => {
+        resultCard.style.display  = 'none';
+        countdownBar.style.display = 'none';
+        idleMsg.style.display     = 'block';
+    }, DISMISS_MS);
+}
+
+function addToHistory({ name, sn, time, status, type }) {
+    const scroll = document.getElementById('historyScroll');
+    const dotClass = type === 'time_out' ? 'dot-unknown'
+                   : status === 'Late'   ? 'dot-late'
+                   : status === 'Present'? 'dot-present'
+                   : 'dot-absent';
+    const badgeClass = type === 'time_out' ? 'pill-timeout'
+                     : status === 'Late'   ? 'pill-late'
+                     : 'pill-present';
+    const badgeLabel = type === 'time_out' ? 'Out' : status;
+
+    const row = document.createElement('div');
+    row.className = 'log-row';
+    row.innerHTML = `
+        <div class="log-dot ${dotClass}"></div>
+        <div class="log-name">${name}</div>
+        <div class="log-sn">${sn}</div>
+        <div class="log-time">${time}</div>
+        <span class="pill ${badgeClass} log-badge" style="font-size:9px;padding:2px 8px;">${badgeLabel}</span>
+    `;
+    scroll.insertBefore(row, scroll.firstChild);
+
+    // Cap at 20
+    while (scroll.children.length > 20) scroll.removeChild(scroll.lastChild);
+    document.getElementById('historyCount').textContent = `${scroll.children.length} entries`;
+}
+
+// ── FETCH RECENT LOGS ON LOAD ─────────────────────────────────────────────
+async function loadRecentLogs() {
+    try {
+        const res  = await fetch('/api/get_recent_logs');
+        const data = await res.json();
+        if (data.status === 'success' && data.logs) {
+            data.logs.slice().reverse().forEach(log => {
+                addToHistory({
+                    name:   log.name,
+                    sn:     log.student_number,
+                    time:   log.time_in || '—',
+                    status: log.status  || 'Present',
+                    type:   'time_in',
+                });
+            });
+        }
+    } catch (e) { console.warn('Could not load recent logs.'); }
+}
+
+// ── AUTO-SCAN ─────────────────────────────────────────────────────────────
+const autoToggle   = document.getElementById('autoScanToggle');
+const intervalSel  = document.getElementById('intervalSelect');
+
+function getInterval() { return parseInt(intervalSel.value, 10); }
+
+intervalSel.addEventListener('change', () => {
+    document.getElementById('autoIntervalLabel').textContent =
+        intervalSel.options[intervalSel.selectedIndex].text;
+    if (autoToggle.checked) { stopAuto(); startAuto(); }
+});
+
+function startAuto() {
+    autoTimer = setInterval(captureAndScan, getInterval());
+}
+function stopAuto() {
+    clearInterval(autoTimer); autoTimer = null;
+}
+
+autoToggle.addEventListener('change', () => {
+    if (autoToggle.checked) {
+        startAuto();
+        scanBtnText.textContent = 'AUTO';
+    } else {
+        stopAuto();
+        scanBtnText.textContent = 'SCAN FACE';
+    }
+});
+
+// ── MARK ABSENT ───────────────────────────────────────────────────────────
+async function promptMarkAbsent() {
+    if (!currentSchedId) {
+        Swal.fire({
+            icon: 'warning', title: 'No Active Schedule',
+            text: 'There is no active schedule to close.',
+            background: '#0f2b23', color: '#d9f0d9',
+        });
+        return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+        icon: 'question',
+        title: 'Mark Absent',
+        text: 'This will mark all students in this schedule who have not scanned as Absent. Continue?',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark absent',
+        confirmButtonColor: '#e74c3c',
+        background: '#0f2b23', color: '#d9f0d9',
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+        const res  = await fetch('/api/mark_absents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedule_id: currentSchedId })
+        });
+        const data = await res.json();
+        Swal.fire({
+            icon: 'success',
+            title: 'Done',
+            text: `${data.marked_absent || 0} student(s) marked as Absent.`,
+            background: '#0f2b23', color: '#d9f0d9',
+            timer: 3000, showConfirmButton: false,
+        });
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to mark absents.', background: '#0f2b23', color: '#d9f0d9' });
+    }
+}
+
+// ── SOCKET.IO ─────────────────────────────────────────────────────────────
+try {
+    const socket = io('http://127.0.0.1:5000', {
+        reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000
+    });
+    socket.on('attendance_update', () => { /* history updated via scan result */ });
+} catch (e) { console.warn('Socket.IO not available.'); }
+
+// ── CHECK AND MARK EXPIRED SCHEDULES ──────────────────────────────────────
+// Periodically check if any schedules have expired and automatically mark
+// students as absent if they haven't scanned in yet
+async function checkAndMarkExpiredSchedules() {
+    try {
+        const res = await fetch('/api/check-expired-schedules', { method: 'POST' });
+        const data = await res.json();
+        if (data.success && Object.keys(data.details).length > 0) {
+            console.log('Expired schedules checked and absents marked:', data.details);
+        }
+    } catch (e) {
+        console.warn('Error checking expired schedules:', e);
+    }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+    startCamera();
+    loadRecentLogs();
+    checkActiveSchedule();
+    checkAndMarkExpiredSchedules();  // Check on page load
+    setInterval(checkActiveSchedule, 60000); // re-check every minute
+    setInterval(checkAndMarkExpiredSchedules, 120000); // check expired schedules every 2 minutes
+});
+
+scanBtn.addEventListener('click', captureAndScan);
+</script>
+</body>
+</html>
